@@ -52,7 +52,7 @@ export default function GuideDetail() {
 
   // Peek (title bar only, full map) · medium · large — like Apple Maps.
   const snapPoints = useMemo(() => [120, '45%', '90%'], []);
-  const places = guide?.places ?? [];
+  const places = useMemo(() => guide?.places ?? [], [guide?.places]);
   const layers = useMemo(() => guide?.layers ?? [], [guide?.layers]);
 
   // A guide shared with you as a viewer is read-only; owners (and un-synced
