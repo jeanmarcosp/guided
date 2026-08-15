@@ -4,7 +4,7 @@ import * as Haptics from 'expo-haptics';
 import * as Location from 'expo-location';
 import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Alert, Pressable, StyleSheet, Text, View } from 'react-native';
+import { Alert, Pressable, StyleSheet, Text, useWindowDimensions, View } from 'react-native';
 import { MenuView, type MenuAction } from '@react-native-menu/menu';
 import Animated, { useAnimatedStyle, useSharedValue } from 'react-native-reanimated';
 import type MapView from 'react-native-maps';
@@ -28,9 +28,16 @@ const DEFAULT_REGION: Region = {
 const RECENTER_SIZE = 44;
 const CONTROLS_HEIGHT = RECENTER_SIZE * 2 + 8; // locate + fit-all, stacked
 
+// The sheet opens at snapPoints[1] ('45%'). gorhom lays the scroll content out
+// against the tallest snap (90%), so to center the empty message within the
+// *visible* default height we size its block to that 45% region ourselves.
+const DEFAULT_SNAP_FRACTION = 0.45;
+const SHEET_HANDLE_HEIGHT = 24; // gorhom's DEFAULT_HANDLE_HEIGHT
+
 export default function GuideDetail() {
   const colors = useColors();
   const insets = useSafeAreaInsets();
+  const { height: windowHeight } = useWindowDimensions();
   const router = useRouter();
   const { id } = useLocalSearchParams<{ id: string }>();
 
@@ -49,6 +56,14 @@ export default function GuideDetail() {
   const programmaticMove = useRef(false); // a camera move we initiated
   const suppressUntil = useRef(Date.now() + 1000); // swallow trailing settle events
   const [showSearchArea, setShowSearchArea] = useState(false);
+  const [sheetHeaderHeight, setSheetHeaderHeight] = useState(0);
+
+  // Height of the list area visible at the default (45%) snap, so the empty-state
+  // message centers within what the user actually sees on first open.
+  const emptyStateHeight = Math.max(
+    0,
+    windowHeight * DEFAULT_SNAP_FRACTION - SHEET_HANDLE_HEIGHT - sheetHeaderHeight,
+  );
 
   // Peek (title bar only, full map) · medium · large — like Apple Maps.
   const snapPoints = useMemo(() => [120, '45%', '90%'], []);
@@ -424,11 +439,15 @@ export default function GuideDetail() {
         ref={sheetRef}
         index={1}
         snapPoints={snapPoints}
+        enableDynamicSizing={false}
         animatedPosition={sheetTop}
         backgroundStyle={{ backgroundColor: colors.surface }}
         handleIndicatorStyle={{ backgroundColor: colors.handle }}
       >
-        <View style={styles.sheetHeader}>
+        <View
+          style={styles.sheetHeader}
+          onLayout={(e) => setSheetHeaderHeight(e.nativeEvent.layout.height)}
+        >
           <View style={styles.sheetHeaderText}>
             <Text numberOfLines={1} style={[typography.title, { color: colors.textPrimary }]}>
               {guide.name}
@@ -529,7 +548,7 @@ export default function GuideDetail() {
             paddingBottom: insets.bottom + spacing.xl,
           }}
           ListEmptyComponent={
-            <View style={styles.sheetEmpty}>
+            <View style={[styles.sheetEmpty, { height: emptyStateHeight }]}>
               <Ionicons name="location-outline" size={30} color={colors.textTertiary} />
               <Text style={[typography.body, { color: colors.textSecondary, textAlign: 'center' }]}>
                 Tap “Add” to search for places and drop them on the map.
@@ -709,8 +728,8 @@ const styles = StyleSheet.create({
   },
   sheetEmpty: {
     alignItems: 'center',
+    justifyContent: 'center',
     gap: spacing.sm,
-    paddingTop: spacing.lg,
     paddingHorizontal: spacing.sm,
   },
   layerHeader: {
