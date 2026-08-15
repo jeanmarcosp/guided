@@ -2,15 +2,7 @@ import { Ionicons } from '@expo/vector-icons';
 import * as Linking from 'expo-linking';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useCallback, useEffect, useState } from 'react';
-import {
-  ActivityIndicator,
-  Alert,
-  Pressable,
-  Share,
-  StyleSheet,
-  Text,
-  View,
-} from 'react-native';
+import { ActivityIndicator, Alert, Pressable, Share, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import Avatar from '@/components/Avatar';
 import {
@@ -42,11 +34,11 @@ export default function ShareGuideScreen() {
       const rows = await listShares(id);
       const template = rows.find((r) => r.shared_with === null);
       setLinkUrl(template ? Linking.createURL(`share/${template.token}`) : null);
-      const memberRows = rows.filter((r): r is ShareRow & { shared_with: string } => r.shared_with !== null);
-      const nameById = await resolveProfileNames(memberRows.map((r) => r.shared_with));
-      setMembers(
-        memberRows.map((r) => ({ ...r, name: nameById.get(r.shared_with) ?? 'Member' }))
+      const memberRows = rows.filter(
+        (r): r is ShareRow & { shared_with: string } => r.shared_with !== null,
       );
+      const nameById = await resolveProfileNames(memberRows.map((r) => r.shared_with));
+      setMembers(memberRows.map((r) => ({ ...r, name: nameById.get(r.shared_with) ?? 'Member' })));
     } catch (e: any) {
       Alert.alert('Could not load sharing', e?.message ?? 'Please try again.');
     } finally {
@@ -97,7 +89,10 @@ export default function ShareGuideScreen() {
   };
 
   return (
-    <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]} edges={['bottom']}>
+    <SafeAreaView
+      style={[styles.container, { backgroundColor: colors.background }]}
+      edges={['bottom']}
+    >
       <View style={styles.header}>
         <Text style={[typography.title, { color: colors.textPrimary }]}>Share guide</Text>
         <Pressable onPress={() => router.back()} hitSlop={10}>
@@ -106,7 +101,8 @@ export default function ShareGuideScreen() {
       </View>
 
       <Text style={[typography.body, { color: colors.textSecondary, marginBottom: spacing.lg }]}>
-        Anyone with the link can view “{guide?.name ?? 'this guide'}”. They’ll need to sign in to open it.
+        Anyone with the link can view “{guide?.name ?? 'this guide'}”. They’ll need to sign in to
+        open it.
       </Text>
 
       <Pressable

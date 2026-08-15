@@ -29,7 +29,7 @@ type Props = {
  */
 const GuideMap = forwardRef<MapView, Props>(function GuideMap(
   { places, layerColors, initialRegion, onMarkerPress, onMapReady, onRegionChangeComplete },
-  ref
+  ref,
 ) {
   return (
     <MapView

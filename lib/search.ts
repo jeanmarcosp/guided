@@ -43,7 +43,7 @@ function prettyCategory(p: PhotonFeature['properties']): string | undefined {
 export async function searchPlaces(
   query: string,
   near?: { latitude: number; longitude: number },
-  signal?: AbortSignal
+  signal?: AbortSignal,
 ): Promise<SearchResult[]> {
   const q = query.trim();
   if (q.length < 2) return [];
@@ -69,7 +69,7 @@ export async function searchPlaces(
 async function searchPhoton(
   query: string,
   near?: { latitude: number; longitude: number },
-  signal?: AbortSignal
+  signal?: AbortSignal,
 ): Promise<SearchResult[]> {
   const q = query.trim();
   if (q.length < 2) return [];
@@ -94,11 +94,7 @@ async function searchPhoton(
     .filter((f) => f.geometry?.coordinates?.length === 2)
     .map((f) => {
       const [lon, lat] = f.geometry.coordinates;
-      const name =
-        f.properties.name ||
-        f.properties.street ||
-        f.properties.city ||
-        'Unnamed place';
+      const name = f.properties.name || f.properties.street || f.properties.city || 'Unnamed place';
       return {
         name,
         address: buildAddress(f.properties) || undefined,

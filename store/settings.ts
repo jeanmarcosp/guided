@@ -18,6 +18,6 @@ export const useSettings = create<SettingsState>()(
     {
       name: 'guide-maker-settings-v1',
       storage: createJSONStorage(() => AsyncStorage),
-    }
-  )
+    },
+  ),
 );

@@ -31,7 +31,13 @@ import { radius, spacing, typography, useColors } from '@/theme/tokens';
 /** Returns black or white — whichever is readable on the given hex color. */
 function contrastOn(hex: string): string {
   const h = hex.replace('#', '');
-  const full = h.length === 3 ? h.split('').map((c) => c + c).join('') : h;
+  const full =
+    h.length === 3
+      ? h
+          .split('')
+          .map((c) => c + c)
+          .join('')
+      : h;
   const r = parseInt(full.slice(0, 2), 16);
   const g = parseInt(full.slice(2, 4), 16);
   const b = parseInt(full.slice(4, 6), 16);
@@ -79,7 +85,7 @@ export default function ManageLayers() {
             setEditingId(null);
           },
         },
-      ]
+      ],
     );
   }
 
@@ -116,14 +122,22 @@ export default function ManageLayers() {
         ListFooterComponent={
           <Pressable
             onPress={handleAdd}
-            style={({ pressed }) => [styles.addBtn, { borderColor: colors.border }, pressed && { opacity: 0.6 }]}
+            style={({ pressed }) => [
+              styles.addBtn,
+              { borderColor: colors.border },
+              pressed && { opacity: 0.6 },
+            ]}
           >
             <Ionicons name="add" size={20} color={colors.accent} />
             <Text style={[typography.bodyMedium, { color: colors.accent }]}>Add Layer</Text>
           </Pressable>
         }
         renderItem={({ item }) => (
-          <LayerRow layer={item} count={counts[item.id] ?? 0} onEdit={() => setEditingId(item.id)} />
+          <LayerRow
+            layer={item}
+            count={counts[item.id] ?? 0}
+            onEdit={() => setEditingId(item.id)}
+          />
         )}
       />
 
@@ -172,7 +186,11 @@ function LayerRow({ layer, count, onEdit }: LayerRowProps) {
 
       <Pressable
         onPress={onEdit}
-        style={({ pressed }) => [styles.editBtn, { backgroundColor: colors.surfaceAlt }, pressed && { opacity: 0.6 }]}
+        style={({ pressed }) => [
+          styles.editBtn,
+          { backgroundColor: colors.surfaceAlt },
+          pressed && { opacity: 0.6 },
+        ]}
       >
         <Text style={[typography.caption, { color: colors.accent, fontWeight: '600' }]}>Edit</Text>
       </Pressable>
@@ -231,7 +249,10 @@ function LayerEditor({ layer, onSave, onDelete, onClose }: LayerEditorProps) {
       <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
         <Animated.View
           entering={SlideInDown.duration(280)}
-          style={[styles.sheet, { backgroundColor: colors.surface, paddingBottom: insets.bottom + spacing.lg }]}
+          style={[
+            styles.sheet,
+            { backgroundColor: colors.surface, paddingBottom: insets.bottom + spacing.lg },
+          ]}
         >
           <View style={styles.sheetTop}>
             <Text style={[typography.heading, { color: colors.textPrimary }]}>Edit Layer</Text>
@@ -250,11 +271,16 @@ function LayerEditor({ layer, onSave, onDelete, onClose }: LayerEditorProps) {
               onChangeText={setName}
               placeholder="Layer name"
               placeholderTextColor={colors.textTertiary}
-              style={[styles.nameInput, { color: colors.textPrimary, backgroundColor: colors.surfaceAlt }]}
+              style={[
+                styles.nameInput,
+                { color: colors.textPrimary, backgroundColor: colors.surfaceAlt },
+              ]}
             />
           </View>
 
-          <Text style={[typography.caption, styles.label, { color: colors.textSecondary }]}>COLOR</Text>
+          <Text style={[typography.caption, styles.label, { color: colors.textSecondary }]}>
+            COLOR
+          </Text>
           <View style={styles.swatchRow}>
             {LAYER_COLORS.map((c) => (
               <Pressable
@@ -277,8 +303,15 @@ function LayerEditor({ layer, onSave, onDelete, onClose }: LayerEditorProps) {
               }}
               style={
                 isCustomColor
-                  ? [styles.color, { backgroundColor: color, borderWidth: 3, borderColor: colors.textPrimary }]
-                  : [styles.color, styles.customColor, { borderColor: showWheel ? colors.accent : colors.border }]
+                  ? [
+                      styles.color,
+                      { backgroundColor: color, borderWidth: 3, borderColor: colors.textPrimary },
+                    ]
+                  : [
+                      styles.color,
+                      styles.customColor,
+                      { borderColor: showWheel ? colors.accent : colors.border },
+                    ]
               }
             >
               <Ionicons
@@ -314,8 +347,14 @@ function LayerEditor({ layer, onSave, onDelete, onClose }: LayerEditorProps) {
             </View>
           )}
 
-          <Text style={[typography.caption, styles.label, { color: colors.textSecondary }]}>ICON</Text>
-          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.emojiRow}>
+          <Text style={[typography.caption, styles.label, { color: colors.textSecondary }]}>
+            ICON
+          </Text>
+          <ScrollView
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            contentContainerStyle={styles.emojiRow}
+          >
             <Pressable
               onPress={() => {
                 Keyboard.dismiss();
@@ -346,7 +385,11 @@ function LayerEditor({ layer, onSave, onDelete, onClose }: LayerEditorProps) {
                 style={[
                   styles.emojiBtn,
                   { backgroundColor: colors.surfaceAlt },
-                  emoji === e && { backgroundColor: color + '33', borderColor: color, borderWidth: 2 },
+                  emoji === e && {
+                    backgroundColor: color + '33',
+                    borderColor: color,
+                    borderWidth: 2,
+                  },
                 ]}
               >
                 <Text style={styles.emojiText}>{e}</Text>
@@ -384,7 +427,10 @@ function LayerEditor({ layer, onSave, onDelete, onClose }: LayerEditorProps) {
             }}
           />
 
-          <Pressable onPress={onDelete} style={({ pressed }) => [styles.deleteBtn, pressed && { opacity: 0.6 }]}>
+          <Pressable
+            onPress={onDelete}
+            style={({ pressed }) => [styles.deleteBtn, pressed && { opacity: 0.6 }]}
+          >
             <Ionicons name="trash-outline" size={18} color={colors.danger} />
             <Text style={[typography.bodyMedium, { color: colors.danger }]}>Delete Layer</Text>
           </Pressable>

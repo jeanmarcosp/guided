@@ -33,7 +33,10 @@ export default function Avatar({ name, seed, size = 26 }: Props) {
   const bg = colorFor(seed || name || '?');
   return (
     <View
-      style={[styles.circle, { width: size, height: size, borderRadius: size / 2, backgroundColor: bg }]}
+      style={[
+        styles.circle,
+        { width: size, height: size, borderRadius: size / 2, backgroundColor: bg },
+      ]}
     >
       <Text style={[styles.letter, { fontSize: Math.round(size * 0.46) }]}>{letter}</Text>
     </View>

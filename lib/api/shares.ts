@@ -15,7 +15,7 @@ export type ShareRow = {
 /** Create a reusable share link for a guide and return its deep link URL. */
 export async function createShareLink(
   guideId: string,
-  role: Exclude<GuideRole, 'owner'> = 'viewer'
+  role: Exclude<GuideRole, 'owner'> = 'viewer',
 ): Promise<{ token: string; url: string }> {
   const { data, error } = await supabase
     .from('guide_shares')
@@ -47,7 +47,11 @@ export async function resolveProfileNames(userIds: string[]): Promise<Map<string
     .select('id, display_name, email')
     .in('id', ids);
   const nameById = new Map<string, string>();
-  for (const p of (profiles ?? []) as { id: string; display_name: string | null; email: string | null }[]) {
+  for (const p of (profiles ?? []) as {
+    id: string;
+    display_name: string | null;
+    email: string | null;
+  }[]) {
     const name = p.display_name?.trim() || p.email;
     if (name) nameById.set(p.id, name);
   }

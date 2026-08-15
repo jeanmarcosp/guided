@@ -65,14 +65,16 @@ export default function GuideDetail() {
   useFocusEffect(
     useCallback(() => {
       if (isSharedGuide) void refreshSharedGuides();
-    }, [isSharedGuide])
+    }, [isSharedGuide]),
   );
   const placesLabel =
-    places.length === 0 ? 'No places yet' : `${places.length} place${places.length === 1 ? '' : 's'}`;
+    places.length === 0
+      ? 'No places yet'
+      : `${places.length} place${places.length === 1 ? '' : 's'}`;
 
   const layerColors = useMemo(
     () => Object.fromEntries(layers.map((l) => [l.id, l.color])),
-    [layers]
+    [layers],
   );
 
   // Places whose layer isn't hidden — what the map actually shows.
@@ -109,17 +111,22 @@ export default function GuideDetail() {
       programmaticMove.current = true;
       if (visiblePlaces.length === 1) {
         mapRef.current?.animateToRegion(
-          { latitude: visiblePlaces[0].latitude, longitude: visiblePlaces[0].longitude, latitudeDelta: 0.02, longitudeDelta: 0.02 },
-          animated ? 400 : 0
+          {
+            latitude: visiblePlaces[0].latitude,
+            longitude: visiblePlaces[0].longitude,
+            latitudeDelta: 0.02,
+            longitudeDelta: 0.02,
+          },
+          animated ? 400 : 0,
         );
         return;
       }
       mapRef.current?.fitToCoordinates(
         visiblePlaces.map((p) => ({ latitude: p.latitude, longitude: p.longitude })),
-        { edgePadding: { top: 100, left: 60, right: 60, bottom: 360 }, animated }
+        { edgePadding: { top: 100, left: 60, right: 60, bottom: 360 }, animated },
       );
     },
-    [visiblePlaces]
+    [visiblePlaces],
   );
 
   function collapseLayer(layer: Layer) {
@@ -155,8 +162,13 @@ export default function GuideDetail() {
       const pos = await Location.getCurrentPositionAsync({});
       programmaticMove.current = true;
       mapRef.current?.animateToRegion(
-        { latitude: pos.coords.latitude, longitude: pos.coords.longitude, latitudeDelta: 0.02, longitudeDelta: 0.02 },
-        500
+        {
+          latitude: pos.coords.latitude,
+          longitude: pos.coords.longitude,
+          latitudeDelta: 0.02,
+          longitudeDelta: 0.02,
+        },
+        500,
       );
     } catch {
       // Ignore — location is optional.
@@ -226,8 +238,13 @@ export default function GuideDetail() {
       if (!loc || cancelled) return;
       programmaticMove.current = true;
       mapRef.current?.animateToRegion(
-        { latitude: loc.coords.latitude, longitude: loc.coords.longitude, latitudeDelta: 0.05, longitudeDelta: 0.05 },
-        500
+        {
+          latitude: loc.coords.latitude,
+          longitude: loc.coords.longitude,
+          latitudeDelta: 0.05,
+          longitudeDelta: 0.05,
+        },
+        500,
       );
     })();
     return () => {
@@ -253,7 +270,7 @@ export default function GuideDetail() {
     // Pan to the pin at the current zoom (gentle) rather than zooming in hard.
     mapRef.current?.animateCamera(
       { center: { latitude: place.latitude, longitude: place.longitude } },
-      { duration: 600 }
+      { duration: 600 },
     );
   }
 
@@ -300,7 +317,12 @@ export default function GuideDetail() {
   // Guide was deleted while open.
   if (!guide) {
     return (
-      <View style={[styles.fill, { backgroundColor: colors.background, justifyContent: 'center', alignItems: 'center' }]}>
+      <View
+        style={[
+          styles.fill,
+          { backgroundColor: colors.background, justifyContent: 'center', alignItems: 'center' },
+        ]}
+      >
         <Text style={[typography.body, { color: colors.textSecondary }]}>Guide not found.</Text>
         <Pressable onPress={() => router.replace('/')} style={{ marginTop: spacing.md }}>
           <Text style={[typography.bodyMedium, { color: colors.accent }]}>Back to guides</Text>
@@ -336,7 +358,10 @@ export default function GuideDetail() {
         </Pressable>
         <View style={[styles.titlePill, { backgroundColor: colors.surface }]}>
           <Text style={styles.titleEmoji}>{guide.emoji}</Text>
-          <Text numberOfLines={1} style={[typography.bodyMedium, { color: colors.textPrimary, maxWidth: 180 }]}>
+          <Text
+            numberOfLines={1}
+            style={[typography.bodyMedium, { color: colors.textPrimary, maxWidth: 180 }]}
+          >
             {guide.name}
           </Text>
         </View>
@@ -354,7 +379,11 @@ export default function GuideDetail() {
         <View style={[styles.searchAreaWrap, { top: insets.top + 58 }]} pointerEvents="box-none">
           <Pressable
             onPress={searchThisArea}
-            style={({ pressed }) => [styles.searchAreaPill, { backgroundColor: colors.surface }, pressed && { opacity: 0.7 }]}
+            style={({ pressed }) => [
+              styles.searchAreaPill,
+              { backgroundColor: colors.surface },
+              pressed && { opacity: 0.7 },
+            ]}
           >
             <Ionicons name="search" size={15} color={colors.accent} />
             <Text style={[typography.caption, styles.searchAreaText, { color: colors.accent }]}>
@@ -412,7 +441,11 @@ export default function GuideDetail() {
             {canEdit && (
               <Pressable
                 onPress={() => router.push(`/guide/${guide.id}/share`)}
-                style={({ pressed }) => [styles.iconBtn, { backgroundColor: colors.surfaceAlt }, pressed && { opacity: 0.6 }]}
+                style={({ pressed }) => [
+                  styles.iconBtn,
+                  { backgroundColor: colors.surfaceAlt },
+                  pressed && { opacity: 0.6 },
+                ]}
                 hitSlop={6}
               >
                 <Ionicons name="share-outline" size={20} color={colors.textPrimary} />
@@ -421,7 +454,11 @@ export default function GuideDetail() {
             {canEdit && (
               <Pressable
                 onPress={() => router.push(`/guide/${guide.id}/layers`)}
-                style={({ pressed }) => [styles.iconBtn, { backgroundColor: colors.surfaceAlt }, pressed && { opacity: 0.6 }]}
+                style={({ pressed }) => [
+                  styles.iconBtn,
+                  { backgroundColor: colors.surfaceAlt },
+                  pressed && { opacity: 0.6 },
+                ]}
                 hitSlop={6}
               >
                 <Ionicons name="layers-outline" size={20} color={colors.textPrimary} />
@@ -430,7 +467,11 @@ export default function GuideDetail() {
             {canEdit && (
               <Pressable
                 onPress={openSearch}
-                style={({ pressed }) => [styles.addPlace, { backgroundColor: colors.accent }, pressed && { opacity: 0.8 }]}
+                style={({ pressed }) => [
+                  styles.addPlace,
+                  { backgroundColor: colors.accent },
+                  pressed && { opacity: 0.8 },
+                ]}
               >
                 <Ionicons name="add" size={18} color="#fff" />
                 <Text style={[typography.bodyMedium, { color: '#fff' }]}>Add</Text>
@@ -443,7 +484,11 @@ export default function GuideDetail() {
           <View style={styles.toolbar}>
             <Pressable
               onPress={toggleShowAll}
-              style={({ pressed }) => [styles.toolBtn, { backgroundColor: colors.surfaceAlt }, pressed && { opacity: 0.6 }]}
+              style={({ pressed }) => [
+                styles.toolBtn,
+                { backgroundColor: colors.surfaceAlt },
+                pressed && { opacity: 0.6 },
+              ]}
             >
               <Ionicons
                 name={allHidden ? 'eye-outline' : 'eye-off-outline'}
@@ -457,7 +502,11 @@ export default function GuideDetail() {
 
             <Pressable
               onPress={toggleCollapseAll}
-              style={({ pressed }) => [styles.toolBtn, { backgroundColor: colors.surfaceAlt }, pressed && { opacity: 0.6 }]}
+              style={({ pressed }) => [
+                styles.toolBtn,
+                { backgroundColor: colors.surfaceAlt },
+                pressed && { opacity: 0.6 },
+              ]}
             >
               <Ionicons
                 name={allCollapsed ? 'chevron-down' : 'chevron-up'}
@@ -475,7 +524,10 @@ export default function GuideDetail() {
           sections={sections}
           keyExtractor={(p) => p.id}
           stickySectionHeadersEnabled={false}
-          contentContainerStyle={{ paddingHorizontal: spacing.lg, paddingBottom: insets.bottom + spacing.xl }}
+          contentContainerStyle={{
+            paddingHorizontal: spacing.lg,
+            paddingBottom: insets.bottom + spacing.xl,
+          }}
           ListEmptyComponent={
             <View style={styles.sheetEmpty}>
               <Ionicons name="location-outline" size={30} color={colors.textTertiary} />
@@ -503,7 +555,12 @@ export default function GuideDetail() {
               >
                 {section.layer.name}
               </Text>
-              <Text style={[typography.caption, { color: colors.textTertiary, marginRight: spacing.md }]}>
+              <Text
+                style={[
+                  typography.caption,
+                  { color: colors.textTertiary, marginRight: spacing.md },
+                ]}
+              >
                 {section.count}
               </Text>
               <Pressable onPress={() => hideLayer(section.layer)} hitSlop={10}>
@@ -650,7 +707,12 @@ const styles = StyleSheet.create({
     paddingVertical: spacing.sm,
     borderRadius: radius.pill,
   },
-  sheetEmpty: { alignItems: 'center', gap: spacing.sm, paddingTop: spacing.lg, paddingHorizontal: spacing.sm },
+  sheetEmpty: {
+    alignItems: 'center',
+    gap: spacing.sm,
+    paddingTop: spacing.lg,
+    paddingHorizontal: spacing.sm,
+  },
   layerHeader: {
     flexDirection: 'row',
     alignItems: 'center',

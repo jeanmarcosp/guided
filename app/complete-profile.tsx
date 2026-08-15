@@ -46,7 +46,9 @@ export default function CompleteProfileScreen() {
       >
         <View style={styles.header}>
           <Text style={styles.emoji}>👋</Text>
-          <Text style={[typography.largeTitle, { color: colors.textPrimary }]}>What&rsquo;s your name?</Text>
+          <Text style={[typography.largeTitle, { color: colors.textPrimary }]}>
+            What&rsquo;s your name?
+          </Text>
           <Text style={[typography.body, { color: colors.textSecondary, textAlign: 'center' }]}>
             We&rsquo;ll use it on the guides and places you share with friends.
           </Text>
@@ -64,7 +66,14 @@ export default function CompleteProfileScreen() {
             returnKeyType="done"
             autoFocus
             onSubmitEditing={onSubmit}
-            style={[styles.input, { backgroundColor: colors.surface, borderColor: colors.border, color: colors.textPrimary }]}
+            style={[
+              styles.input,
+              {
+                backgroundColor: colors.surface,
+                borderColor: colors.border,
+                color: colors.textPrimary,
+              },
+            ]}
           />
           <Pressable
             onPress={onSubmit}

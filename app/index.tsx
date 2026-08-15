@@ -18,10 +18,9 @@ import type { Guide } from '@/lib/types';
 import { useGuides } from '@/store/guides';
 import { GUIDE_COLORS, GUIDE_EMOJIS, radius, spacing, typography, useColors } from '@/theme/tokens';
 
-type EditorState = { mode: 'create'; draft: GuideDraft } | { mode: 'edit'; id: string; draft: GuideDraft };
-type Row =
-  | { type: 'header'; label: string }
-  | { type: 'guide'; guide: Guide; shared?: boolean };
+type EditorState =
+  { mode: 'create'; draft: GuideDraft } | { mode: 'edit'; id: string; draft: GuideDraft };
+type Row = { type: 'header'; label: string } | { type: 'guide'; guide: Guide; shared?: boolean };
 
 /** A guide shared with the user (not owned). */
 const isShared = (g: Guide) => g.role === 'viewer' || g.role === 'editor';
@@ -55,7 +54,7 @@ export default function GuidesHome() {
   useFocusEffect(
     useCallback(() => {
       if (hasShared) void refreshSharedGuides();
-    }, [hasShared])
+    }, [hasShared]),
   );
 
   // Flat rows (with interleaved section headers) for the normal, swipeable list.
@@ -79,7 +78,7 @@ export default function GuidesHome() {
 
   const stickyIndices = useMemo(
     () => rows.map((row, i) => (row.type === 'header' ? i : -1)).filter((i) => i >= 0),
-    [rows]
+    [rows],
   );
 
   function handleCreate() {
@@ -223,7 +222,7 @@ export default function GuidesHome() {
         keyExtractor={(g) => g.id}
         onReorder={reorderPinned}
         renderItem={renderDragRow}
-      />
+      />,
     );
   }
   if (restList.length > 0) {
@@ -239,14 +238,19 @@ export default function GuidesHome() {
         keyExtractor={(g) => g.id}
         onReorder={reorderRest}
         renderItem={renderDragRow}
-      />
+      />,
     );
   }
 
   const contentStyle = { paddingHorizontal: spacing.lg, paddingBottom: insets.bottom + spacing.xl };
 
   return (
-    <View style={[styles.container, { backgroundColor: colors.background, paddingTop: insets.top + spacing.sm }]}>
+    <View
+      style={[
+        styles.container,
+        { backgroundColor: colors.background, paddingTop: insets.top + spacing.sm },
+      ]}
+    >
       <View style={styles.header}>
         <Text style={[typography.largeTitle, { color: colors.textPrimary }]}>
           {reordering ? 'Reorder' : 'Guides'}
@@ -260,7 +264,11 @@ export default function GuidesHome() {
             <>
               <Pressable
                 onPress={() => router.push('/settings')}
-                style={({ pressed }) => [styles.iconBtn, { backgroundColor: colors.surface, borderColor: colors.border }, pressed && { opacity: 0.6 }]}
+                style={({ pressed }) => [
+                  styles.iconBtn,
+                  { backgroundColor: colors.surface, borderColor: colors.border },
+                  pressed && { opacity: 0.6 },
+                ]}
                 hitSlop={8}
               >
                 <Ionicons name="person-circle-outline" size={22} color={colors.textPrimary} />
@@ -268,7 +276,11 @@ export default function GuidesHome() {
               {ownedGuides.length > 1 && (
                 <Pressable
                   onPress={() => setReordering(true)}
-                  style={({ pressed }) => [styles.iconBtn, { backgroundColor: colors.surface, borderColor: colors.border }, pressed && { opacity: 0.6 }]}
+                  style={({ pressed }) => [
+                    styles.iconBtn,
+                    { backgroundColor: colors.surface, borderColor: colors.border },
+                    pressed && { opacity: 0.6 },
+                  ]}
                   hitSlop={8}
                 >
                   <Ionicons name="swap-vertical" size={20} color={colors.textPrimary} />
@@ -276,7 +288,11 @@ export default function GuidesHome() {
               )}
               <Pressable
                 onPress={handleCreate}
-                style={({ pressed }) => [styles.addBtn, { backgroundColor: colors.accent }, pressed && { opacity: 0.7 }]}
+                style={({ pressed }) => [
+                  styles.addBtn,
+                  { backgroundColor: colors.accent },
+                  pressed && { opacity: 0.7 },
+                ]}
                 hitSlop={8}
               >
                 <Ionicons name="add" size={26} color="#fff" />
@@ -288,7 +304,12 @@ export default function GuidesHome() {
 
       {guides.length === 0 ? (
         <View style={styles.empty}>
-          <View style={[styles.emptyIcon, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+          <View
+            style={[
+              styles.emptyIcon,
+              { backgroundColor: colors.surface, borderColor: colors.border },
+            ]}
+          >
             <Ionicons name="map-outline" size={34} color={colors.textTertiary} />
           </View>
           <Text style={[typography.heading, { color: colors.textPrimary }]}>No guides yet</Text>
@@ -297,7 +318,11 @@ export default function GuidesHome() {
           </Text>
           <Pressable
             onPress={handleCreate}
-            style={({ pressed }) => [styles.cta, { backgroundColor: colors.accent }, pressed && { opacity: 0.8 }]}
+            style={({ pressed }) => [
+              styles.cta,
+              { backgroundColor: colors.accent },
+              pressed && { opacity: 0.8 },
+            ]}
           >
             <Ionicons name="add" size={18} color="#fff" />
             <Text style={[typography.bodyMedium, { color: '#fff' }]}>Create your first guide</Text>
@@ -342,7 +367,9 @@ function SectionHeader({ label }: { label: string }) {
   const colors = useColors();
   return (
     <View style={[styles.stickyHeader, { backgroundColor: colors.background }]}>
-      <Text style={[typography.caption, styles.sectionLabel, { color: colors.textTertiary }]}>{label}</Text>
+      <Text style={[typography.caption, styles.sectionLabel, { color: colors.textTertiary }]}>
+        {label}
+      </Text>
     </View>
   );
 }
@@ -400,7 +427,13 @@ const styles = StyleSheet.create({
   grip: { paddingHorizontal: 2 },
   rowCard: { flex: 1 },
   guideSpacer: { marginBottom: spacing.md },
-  empty: { flex: 1, alignItems: 'center', justifyContent: 'center', paddingHorizontal: spacing.xxl, gap: spacing.md },
+  empty: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: spacing.xxl,
+    gap: spacing.md,
+  },
   emptyIcon: {
     width: 76,
     height: 76,

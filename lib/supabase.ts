@@ -33,7 +33,7 @@ class LargeSecureStore {
     if (!encryptionKeyHex) return null;
     const cipher = new aesjs.ModeOfOperation.ctr(
       aesjs.utils.hex.toBytes(encryptionKeyHex),
-      new aesjs.Counter(1)
+      new aesjs.Counter(1),
     );
     const decryptedBytes = cipher.decrypt(aesjs.utils.hex.toBytes(value));
     return aesjs.utils.utf8.fromBytes(decryptedBytes);

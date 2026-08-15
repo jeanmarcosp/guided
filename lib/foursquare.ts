@@ -10,7 +10,7 @@ export const isFoursquareAvailable = isSupabaseConfigured;
 export async function searchFoursquare(
   query: string,
   near?: { latitude: number; longitude: number },
-  signal?: AbortSignal
+  signal?: AbortSignal,
 ): Promise<SearchResult[]> {
   const { data, error } = await supabase.functions.invoke('foursquare-search', {
     body: { query, near },

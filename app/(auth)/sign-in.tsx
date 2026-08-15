@@ -29,14 +29,16 @@ export default function SignInScreen() {
 
   useEffect(() => {
     if (!APPLE_SIGN_IN_ENABLED) return;
-    AppleAuthentication.isAvailableAsync().then(setAppleAvailable).catch(() => setAppleAvailable(false));
+    AppleAuthentication.isAvailableAsync()
+      .then(setAppleAvailable)
+      .catch(() => setAppleAvailable(false));
   }, []);
 
   const guardConfigured = () => {
     if (!isSupabaseConfigured) {
       Alert.alert(
         'Backend not configured',
-        'Set EXPO_PUBLIC_SUPABASE_URL and EXPO_PUBLIC_SUPABASE_ANON_KEY in .env.local, then restart.'
+        'Set EXPO_PUBLIC_SUPABASE_URL and EXPO_PUBLIC_SUPABASE_ANON_KEY in .env.local, then restart.',
       );
       return false;
     }
@@ -141,13 +143,20 @@ export default function SignInScreen() {
                 onSubmitEditing={onSendCode}
                 style={[
                   styles.input,
-                  { backgroundColor: colors.surface, borderColor: colors.border, color: colors.textPrimary },
+                  {
+                    backgroundColor: colors.surface,
+                    borderColor: colors.border,
+                    color: colors.textPrimary,
+                  },
                 ]}
               />
               <Pressable
                 onPress={onSendCode}
                 disabled={busy}
-                style={[styles.emailButton, { backgroundColor: colors.accent, opacity: busy ? 0.6 : 1 }]}
+                style={[
+                  styles.emailButton,
+                  { backgroundColor: colors.accent, opacity: busy ? 0.6 : 1 },
+                ]}
               >
                 {busy ? (
                   <ActivityIndicator color="#fff" />
@@ -173,26 +182,40 @@ export default function SignInScreen() {
                 style={[
                   styles.input,
                   styles.codeInput,
-                  { backgroundColor: colors.surface, borderColor: colors.border, color: colors.textPrimary },
+                  {
+                    backgroundColor: colors.surface,
+                    borderColor: colors.border,
+                    color: colors.textPrimary,
+                  },
                 ]}
               />
               <Pressable
                 onPress={onVerifyCode}
                 disabled={busy}
-                style={[styles.emailButton, { backgroundColor: colors.accent, opacity: busy ? 0.6 : 1 }]}
+                style={[
+                  styles.emailButton,
+                  { backgroundColor: colors.accent, opacity: busy ? 0.6 : 1 },
+                ]}
               >
                 {busy ? (
                   <ActivityIndicator color="#fff" />
                 ) : (
-                  <Text style={[typography.bodyMedium, { color: '#fff' }]}>Verify &amp; sign in</Text>
+                  <Text style={[typography.bodyMedium, { color: '#fff' }]}>
+                    Verify &amp; sign in
+                  </Text>
                 )}
               </Pressable>
               <Pressable
-                onPress={() => { setStep('email'); setCode(''); }}
+                onPress={() => {
+                  setStep('email');
+                  setCode('');
+                }}
                 hitSlop={8}
                 style={styles.linkBtn}
               >
-                <Text style={[typography.caption, { color: colors.accent }]}>Use a different email</Text>
+                <Text style={[typography.caption, { color: colors.accent }]}>
+                  Use a different email
+                </Text>
               </Pressable>
             </>
           )}

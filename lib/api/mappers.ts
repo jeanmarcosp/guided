@@ -80,7 +80,7 @@ export function guideRowsToGuide(
   layers: LayerRow[],
   places: PlaceRow[],
   role: GuideRole,
-  ownerName?: string
+  ownerName?: string,
 ): Guide {
   return {
     id: guide.id,
@@ -92,11 +92,7 @@ export function guideRowsToGuide(
     ownerId: guide.owner_id,
     role,
     ownerName,
-    layers: [...layers]
-      .sort((a, b) => a.sort_order - b.sort_order)
-      .map(layerRowToLayer),
-    places: [...places]
-      .sort((a, b) => ms(a.created_at) - ms(b.created_at))
-      .map(placeRowToPlace),
+    layers: [...layers].sort((a, b) => a.sort_order - b.sort_order).map(layerRowToLayer),
+    places: [...places].sort((a, b) => ms(a.created_at) - ms(b.created_at)).map(placeRowToPlace),
   };
 }

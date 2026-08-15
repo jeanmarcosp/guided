@@ -88,7 +88,14 @@ export default function RootLayout() {
         <SafeAreaProvider>
           <StatusBar style={scheme === 'dark' ? 'light' : 'dark'} />
           {status === 'loading' ? (
-            <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.background }}>
+            <View
+              style={{
+                flex: 1,
+                alignItems: 'center',
+                justifyContent: 'center',
+                backgroundColor: colors.background,
+              }}
+            >
               <ActivityIndicator color={colors.textPrimary} />
             </View>
           ) : (

@@ -3,16 +3,9 @@
   "compilerOptions": {
     "strict": true,
     "paths": {
-      "@/*": [
-        "./*"
-      ]
+      "@/*": ["./*"]
     }
   },
-  "include": [
-    "**/*.ts",
-    "**/*.tsx"
-  ],
-  "exclude": [
-    "supabase/functions"
-  ]
+  "include": ["**/*.ts", "**/*.tsx"],
+  "exclude": ["supabase/functions"]
 }

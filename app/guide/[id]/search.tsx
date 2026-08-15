@@ -37,12 +37,12 @@ export default function SearchScreen() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [near, setNear] = useState<{ latitude: number; longitude: number } | undefined>(() =>
-    lat && lng ? { latitude: parseFloat(lat), longitude: parseFloat(lng) } : undefined
+    lat && lng ? { latitude: parseFloat(lat), longitude: parseFloat(lng) } : undefined,
   );
 
   const addedKeys = useMemo(
     () => new Set((guide?.places ?? []).map((p) => coordKey(p.latitude, p.longitude))),
-    [guide?.places]
+    [guide?.places],
   );
 
   // Only fall back to device location if the map center wasn't provided.
@@ -79,7 +79,8 @@ export default function SearchScreen() {
         const res = await searchPlaces(q, near, controller.signal);
         setResults(res);
       } catch (e) {
-        if ((e as Error).name !== 'AbortError') setError('Could not load results. Check your connection.');
+        if ((e as Error).name !== 'AbortError')
+          setError('Could not load results. Check your connection.');
       } finally {
         setLoading(false);
       }
@@ -98,7 +99,12 @@ export default function SearchScreen() {
   }
 
   return (
-    <View style={[styles.fill, { backgroundColor: colors.background, paddingTop: insets.top + spacing.sm }]}>
+    <View
+      style={[
+        styles.fill,
+        { backgroundColor: colors.background, paddingTop: insets.top + spacing.sm },
+      ]}
+    >
       <View style={styles.header}>
         <View style={[styles.searchBox, { backgroundColor: colors.surfaceAlt }]}>
           <Ionicons name="search" size={18} color={colors.textTertiary} />
@@ -135,14 +141,16 @@ export default function SearchScreen() {
         </View>
       ) : error ? (
         <View style={styles.center}>
-          <Text style={[typography.body, { color: colors.textSecondary, textAlign: 'center' }]}>{error}</Text>
+          <Text style={[typography.body, { color: colors.textSecondary, textAlign: 'center' }]}>
+            {error}
+          </Text>
         </View>
       ) : query.trim().length < 2 ? (
         <View style={styles.center}>
           <Ionicons name="search" size={28} color={colors.textTertiary} />
           <Text style={[typography.body, { color: colors.textSecondary, textAlign: 'center' }]}>
-            Results are near the map&apos;s current area. Pan the map to another city to
-            search there.
+            Results are near the map&apos;s current area. Pan the map to another city to search
+            there.
           </Text>
         </View>
       ) : results.length === 0 ? (
@@ -156,8 +164,13 @@ export default function SearchScreen() {
           data={results}
           keyExtractor={(r, i) => `${coordKey(r.latitude, r.longitude)}-${i}`}
           keyboardShouldPersistTaps="handled"
-          contentContainerStyle={{ paddingHorizontal: spacing.lg, paddingBottom: insets.bottom + spacing.xxl }}
-          ItemSeparatorComponent={() => <View style={[styles.sep, { backgroundColor: colors.border }]} />}
+          contentContainerStyle={{
+            paddingHorizontal: spacing.lg,
+            paddingBottom: insets.bottom + spacing.xxl,
+          }}
+          ItemSeparatorComponent={() => (
+            <View style={[styles.sep, { backgroundColor: colors.border }]} />
+          )}
           renderItem={({ item }) => (
             <SearchResultRow
               result={item}
@@ -190,6 +203,12 @@ const styles = StyleSheet.create({
     borderRadius: radius.sm,
   },
   input: { flex: 1, fontSize: 16, paddingVertical: 0, letterSpacing: 0 }, // letterSpacing guards vs RN#42589
-  center: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: spacing.md, paddingHorizontal: spacing.xxl },
+  center: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: spacing.md,
+    paddingHorizontal: spacing.xxl,
+  },
   sep: { height: StyleSheet.hairlineWidth, marginLeft: 50 },
 });

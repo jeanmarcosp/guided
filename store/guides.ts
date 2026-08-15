@@ -2,12 +2,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { create } from 'zustand';
 import { createJSONStorage, persist } from 'zustand/middleware';
 import { uid } from '@/lib/id';
-import {
-  assignLayers,
-  categorizeLayer,
-  makeCustomLayer,
-  makeLayerFromKind,
-} from '@/lib/layers';
+import { assignLayers, categorizeLayer, makeCustomLayer, makeLayerFromKind } from '@/lib/layers';
 import type { Guide, Layer, Place } from '@/lib/types';
 import { GUIDE_COLORS, GUIDE_EMOJIS } from '@/theme/tokens';
 
@@ -94,7 +89,6 @@ export const useGuides = create<GuidesState>()(
           return { guides: next };
         }),
 
-
       updateGuideStyle: (id, emoji, color) =>
         set((s) => ({ guides: mapGuide(s.guides, id, (g) => ({ ...g, emoji, color })) })),
 
@@ -108,8 +102,7 @@ export const useGuides = create<GuidesState>()(
           })),
         })),
 
-      deleteGuide: (id) =>
-        set((s) => ({ guides: s.guides.filter((g) => g.id !== id) })),
+      deleteGuide: (id) => set((s) => ({ guides: s.guides.filter((g) => g.id !== id) })),
 
       addPlaceToGuide: (guideId, place) =>
         set((s) => ({
@@ -118,7 +111,7 @@ export const useGuides = create<GuidesState>()(
             const exists = g.places.some(
               (p) =>
                 Math.abs(p.latitude - place.latitude) < 1e-6 &&
-                Math.abs(p.longitude - place.longitude) < 1e-6
+                Math.abs(p.longitude - place.longitude) < 1e-6,
             );
             if (exists) return g;
 
@@ -175,7 +168,7 @@ export const useGuides = create<GuidesState>()(
               ...l,
               ...patch,
               name: patch.name !== undefined ? patch.name.trim() || l.name : l.name,
-            }))
+            })),
           ),
         })),
 
@@ -191,7 +184,7 @@ export const useGuides = create<GuidesState>()(
               remaining = [fallback];
             }
             const places = g.places.map((p) =>
-              p.layerId === layerId ? { ...p, layerId: fallback?.id } : p
+              p.layerId === layerId ? { ...p, layerId: fallback?.id } : p,
             );
             return { ...g, layers: remaining, places };
           }),
@@ -223,14 +216,14 @@ export const useGuides = create<GuidesState>()(
       toggleLayerHidden: (guideId, layerId) =>
         set((s) => ({
           guides: mapGuide(s.guides, guideId, (g) =>
-            mapLayer(g, layerId, (l) => ({ ...l, hidden: !l.hidden }))
+            mapLayer(g, layerId, (l) => ({ ...l, hidden: !l.hidden })),
           ),
         })),
 
       toggleLayerCollapsed: (guideId, layerId) =>
         set((s) => ({
           guides: mapGuide(s.guides, guideId, (g) =>
-            mapLayer(g, layerId, (l) => ({ ...l, collapsed: !l.collapsed }))
+            mapLayer(g, layerId, (l) => ({ ...l, collapsed: !l.collapsed })),
           ),
         })),
 
@@ -273,6 +266,6 @@ export const useGuides = create<GuidesState>()(
       onRehydrateStorage: () => (state) => {
         if (state) state.hydrated = true;
       },
-    }
-  )
+    },
+  ),
 );

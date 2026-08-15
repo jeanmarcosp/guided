@@ -1,11 +1,6 @@
 import { supabase } from '@/lib/supabase';
 import type { Guide, GuideRole } from '@/lib/types';
-import {
-  guideRowsToGuide,
-  type GuideRow,
-  type LayerRow,
-  type PlaceRow,
-} from '@/lib/api/mappers';
+import { guideRowsToGuide, type GuideRow, type LayerRow, type PlaceRow } from '@/lib/api/mappers';
 
 /**
  * Fetch every guide the user can see (owned + shared, enforced by RLS) and
@@ -45,7 +40,7 @@ export async function fetchGuides(userId: string): Promise<Guide[]> {
   const layerRows = (layers ?? []) as LayerRow[];
   const placeRows = (places ?? []) as PlaceRow[];
   const roleByGuide = new Map<string, GuideRole>(
-    ((shares ?? []) as { guide_id: string; role: GuideRole }[]).map((s) => [s.guide_id, s.role])
+    ((shares ?? []) as { guide_id: string; role: GuideRole }[]).map((s) => [s.guide_id, s.role]),
   );
   const ownerNameById = new Map<string, string>();
   for (const o of (owners ?? []) as OwnerRow[]) {
@@ -55,13 +50,13 @@ export async function fetchGuides(userId: string): Promise<Guide[]> {
 
   return guideRows.map((g) => {
     const owned = g.owner_id === userId;
-    const role: GuideRole = owned ? 'owner' : roleByGuide.get(g.id) ?? 'viewer';
+    const role: GuideRole = owned ? 'owner' : (roleByGuide.get(g.id) ?? 'viewer');
     return guideRowsToGuide(
       g,
       layerRows.filter((l) => l.guide_id === g.id),
       placeRows.filter((p) => p.guide_id === g.id),
       role,
-      owned ? undefined : ownerNameById.get(g.owner_id)
+      owned ? undefined : ownerNameById.get(g.owner_id),
     );
   });
 }
@@ -100,7 +95,11 @@ export async function pushGuide(guide: Guide, ownerId: string): Promise<void> {
     const { error } = await supabase.from('layers').upsert(layerRows);
     if (error) throw error;
   }
-  await deleteMissing('layers', guide.id, layers.map((l) => l.id));
+  await deleteMissing(
+    'layers',
+    guide.id,
+    layers.map((l) => l.id),
+  );
 
   const placeRows = guide.places.map((p) => ({
     id: p.id,
@@ -117,7 +116,11 @@ export async function pushGuide(guide: Guide, ownerId: string): Promise<void> {
     const { error } = await supabase.from('places').upsert(placeRows);
     if (error) throw error;
   }
-  await deleteMissing('places', guide.id, guide.places.map((p) => p.id));
+  await deleteMissing(
+    'places',
+    guide.id,
+    guide.places.map((p) => p.id),
+  );
 }
 
 /** Delete child rows of a guide whose ids are no longer present locally. */
@@ -136,8 +139,6 @@ export async function deleteGuideRemote(guideId: string): Promise<void> {
 /** Persist guide list order (owner's own guides). */
 export async function reorderGuidesRemote(orderedIds: string[]): Promise<void> {
   await Promise.all(
-    orderedIds.map((id, i) =>
-      supabase.from('guides').update({ sort_order: i }).eq('id', id)
-    )
+    orderedIds.map((id, i) => supabase.from('guides').update({ sort_order: i }).eq('id', id)),
   );
 }

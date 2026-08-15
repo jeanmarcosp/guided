@@ -29,13 +29,13 @@ function prettifyCategory(raw?: string): string | undefined {
 /** Search Apple's place database (same data as Apple Maps). */
 export async function searchApple(
   query: string,
-  near?: { latitude: number; longitude: number }
+  near?: { latitude: number; longitude: number },
 ): Promise<SearchResult[]> {
   if (!AppleSearch) throw new Error('AppleSearch native module is unavailable');
   const raw: RawResult[] = await AppleSearch.search(
     query,
     near?.latitude ?? null,
-    near?.longitude ?? null
+    near?.longitude ?? null,
   );
   return raw.map((r) => ({
     name: r.name,
@@ -52,7 +52,7 @@ export async function searchApple(
  */
 export async function openInMaps(
   query: string,
-  near: { latitude: number; longitude: number }
+  near: { latitude: number; longitude: number },
 ): Promise<boolean> {
   if (!AppleSearch) throw new Error('AppleSearch native module is unavailable');
   return AppleSearch.openInMaps(query, near.latitude, near.longitude);

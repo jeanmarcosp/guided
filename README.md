@@ -42,9 +42,9 @@ npm start        # start the Metro dev server (Expo Go / web)
 
 ### Environment variables
 
-| Variable | Required | Description |
-| --- | --- | --- |
-| `EXPO_PUBLIC_FOURSQUARE_API_KEY` | No | Enables Foursquare place search. Get a free key at [foursquare.com/developers](https://foursquare.com/developers). Without it, search falls back to OpenStreetMap. |
+| Variable                         | Required | Description                                                                                                                                                        |
+| -------------------------------- | -------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `EXPO_PUBLIC_FOURSQUARE_API_KEY` | No       | Enables Foursquare place search. Get a free key at [foursquare.com/developers](https://foursquare.com/developers). Without it, search falls back to OpenStreetMap. |
 
 Copy `.env.example` to `.env.local` and fill it in. `.env.local` is git-ignored and never committed. Restart the dev server after editing (`npx expo start -c`).
 
@@ -63,12 +63,12 @@ theme/               Design tokens (colors, spacing, typography)
 
 ## Scripts
 
-| Command | What it does |
-| --- | --- |
-| `npm start` | Start the Expo dev server |
-| `npm run ios` | Build and run the native iOS dev build |
-| `npm run android` | Build and run on Android |
-| `npm run web` | Run in the browser |
+| Command           | What it does                           |
+| ----------------- | -------------------------------------- |
+| `npm start`       | Start the Expo dev server              |
+| `npm run ios`     | Build and run the native iOS dev build |
+| `npm run android` | Build and run on Android               |
+| `npm run web`     | Run in the browser                     |
 
 ## License
 

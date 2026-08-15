@@ -28,7 +28,16 @@ type Props = {
   onClose: () => void;
 };
 
-export default function GuideEditor({ visible, mode, initial, pinned, onTogglePin, onSubmit, onDelete, onClose }: Props) {
+export default function GuideEditor({
+  visible,
+  mode,
+  initial,
+  pinned,
+  onTogglePin,
+  onSubmit,
+  onDelete,
+  onClose,
+}: Props) {
   const colors = useColors();
   const insets = useSafeAreaInsets();
 
@@ -55,7 +64,10 @@ export default function GuideEditor({ visible, mode, initial, pinned, onTogglePi
       <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
         <Animated.View
           entering={SlideInDown.duration(280)}
-          style={[styles.sheet, { backgroundColor: colors.surface, paddingBottom: insets.bottom + spacing.lg }]}
+          style={[
+            styles.sheet,
+            { backgroundColor: colors.surface, paddingBottom: insets.bottom + spacing.lg },
+          ]}
         >
           <View style={styles.top}>
             <Pressable onPress={onClose} hitSlop={8}>
@@ -81,11 +93,16 @@ export default function GuideEditor({ visible, mode, initial, pinned, onTogglePi
               onChangeText={setName}
               placeholder="Guide name"
               placeholderTextColor={colors.textTertiary}
-              style={[styles.nameInput, { color: colors.textPrimary, backgroundColor: colors.surfaceAlt }]}
+              style={[
+                styles.nameInput,
+                { color: colors.textPrimary, backgroundColor: colors.surfaceAlt },
+              ]}
             />
           </View>
 
-          <Text style={[typography.caption, styles.label, { color: colors.textSecondary }]}>COLOR</Text>
+          <Text style={[typography.caption, styles.label, { color: colors.textSecondary }]}>
+            COLOR
+          </Text>
           <View style={styles.swatchRow}>
             {GUIDE_COLORS.map((c) => (
               <Pressable
@@ -100,8 +117,14 @@ export default function GuideEditor({ visible, mode, initial, pinned, onTogglePi
             ))}
           </View>
 
-          <Text style={[typography.caption, styles.label, { color: colors.textSecondary }]}>ICON</Text>
-          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.emojiRow}>
+          <Text style={[typography.caption, styles.label, { color: colors.textSecondary }]}>
+            ICON
+          </Text>
+          <ScrollView
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            contentContainerStyle={styles.emojiRow}
+          >
             {GUIDE_EMOJIS.map((e) => (
               <Pressable
                 key={e}
@@ -109,7 +132,11 @@ export default function GuideEditor({ visible, mode, initial, pinned, onTogglePi
                 style={[
                   styles.emojiBtn,
                   { backgroundColor: colors.surfaceAlt },
-                  emoji === e && { backgroundColor: color + '33', borderColor: color, borderWidth: 2 },
+                  emoji === e && {
+                    backgroundColor: color + '33',
+                    borderColor: color,
+                    borderWidth: 2,
+                  },
                 ]}
               >
                 <Text style={styles.emojiText}>{e}</Text>
@@ -120,7 +147,11 @@ export default function GuideEditor({ visible, mode, initial, pinned, onTogglePi
           {mode === 'edit' && onTogglePin && (
             <Pressable
               onPress={onTogglePin}
-              style={({ pressed }) => [styles.pinRow, { backgroundColor: colors.surfaceAlt }, pressed && { opacity: 0.6 }]}
+              style={({ pressed }) => [
+                styles.pinRow,
+                { backgroundColor: colors.surfaceAlt },
+                pressed && { opacity: 0.6 },
+              ]}
             >
               <MaterialCommunityIcons
                 name={pinned ? 'pin-off' : 'pin'}
@@ -135,7 +166,10 @@ export default function GuideEditor({ visible, mode, initial, pinned, onTogglePi
           )}
 
           {mode === 'edit' && onDelete && (
-            <Pressable onPress={onDelete} style={({ pressed }) => [styles.deleteBtn, pressed && { opacity: 0.6 }]}>
+            <Pressable
+              onPress={onDelete}
+              style={({ pressed }) => [styles.deleteBtn, pressed && { opacity: 0.6 }]}
+            >
               <Ionicons name="trash-outline" size={18} color={colors.danger} />
               <Text style={[typography.bodyMedium, { color: colors.danger }]}>Delete Guide</Text>
             </Pressable>

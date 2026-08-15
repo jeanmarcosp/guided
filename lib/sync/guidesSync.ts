@@ -34,7 +34,7 @@ function schedulePush(guide: Guide) {
       } catch (e: any) {
         console.warn('[sync] pushGuide failed:', e?.message ?? e, e?.code ?? '', e?.details ?? '');
       }
-    }, PUSH_DEBOUNCE_MS)
+    }, PUSH_DEBOUNCE_MS),
   );
 }
 
@@ -88,7 +88,8 @@ export async function refreshSharedGuides(): Promise<void> {
       const localIds = new Set(state.guides.map((g) => g.id));
       const merged: Guide[] = [];
       for (const g of state.guides) {
-        if (pushable(g)) merged.push(g); // owned: local stays authoritative
+        if (pushable(g))
+          merged.push(g); // owned: local stays authoritative
         // shared: refresh from server, but keep our own hide/collapse view state.
         else if (serverById.has(g.id)) merged.push(withLocalLayerView(serverById.get(g.id)!, g));
         // else: a shared guide we can no longer see — drop it.

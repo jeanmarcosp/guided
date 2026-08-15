@@ -34,7 +34,7 @@ export default function SwipeActionRow({ children, actions, onPress, onLongPress
   function renderRightActions(
     _progress: unknown,
     _translation: unknown,
-    methods: SwipeableMethods
+    methods: SwipeableMethods,
   ) {
     return (
       <View style={[styles.actions, { width: revealWidth }]}>
@@ -45,7 +45,11 @@ export default function SwipeActionRow({ children, actions, onPress, onLongPress
               methods.close();
               a.onPress();
             }}
-            style={({ pressed }) => [styles.bubble, { backgroundColor: a.color }, pressed && { opacity: 0.7 }]}
+            style={({ pressed }) => [
+              styles.bubble,
+              { backgroundColor: a.color },
+              pressed && { opacity: 0.7 },
+            ]}
           >
             {a.icon}
           </Pressable>

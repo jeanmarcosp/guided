@@ -46,7 +46,12 @@ export default function SettingsScreen() {
   }
 
   return (
-    <View style={[styles.fill, { backgroundColor: colors.background, paddingTop: insets.top + spacing.sm }]}>
+    <View
+      style={[
+        styles.fill,
+        { backgroundColor: colors.background, paddingTop: insets.top + spacing.sm },
+      ]}
+    >
       <View style={styles.header}>
         <Pressable onPress={goBack} hitSlop={8} style={styles.backBtn}>
           <Ionicons name="chevron-back" size={24} color={colors.textPrimary} />
@@ -60,7 +65,9 @@ export default function SettingsScreen() {
         showsVerticalScrollIndicator={false}
       >
         {/* Profile */}
-        <View style={[styles.card, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+        <View
+          style={[styles.card, { backgroundColor: colors.surface, borderColor: colors.border }]}
+        >
           <Avatar name={name ?? email} seed={profile?.id ?? user?.id} size={56} />
           <View style={styles.profileText}>
             <Text style={[typography.heading, { color: colors.textPrimary }]}>

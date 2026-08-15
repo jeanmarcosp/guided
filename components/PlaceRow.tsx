@@ -29,7 +29,14 @@ type Props = {
   readOnly?: boolean;
 };
 
-export default function PlaceRow({ place, color, onPress, onLongPress, onDelete, readOnly }: Props) {
+export default function PlaceRow({
+  place,
+  color,
+  onPress,
+  onLongPress,
+  onDelete,
+  readOnly,
+}: Props) {
   const colors = useColors();
 
   const translateX = useSharedValue(0);
@@ -125,7 +132,10 @@ export default function PlaceRow({ place, color, onPress, onLongPress, onDelete,
             </View>
 
             <View style={styles.body}>
-              <Text numberOfLines={1} style={[typography.bodyMedium, { color: colors.textPrimary }]}>
+              <Text
+                numberOfLines={1}
+                style={[typography.bodyMedium, { color: colors.textPrimary }]}
+              >
                 {place.name}
               </Text>
               {place.category && (

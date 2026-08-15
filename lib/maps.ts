@@ -16,7 +16,7 @@ function openViaUrl(place: Place) {
 export function openPlaceInAppleMaps(place: Place) {
   if (isAppleSearchAvailable) {
     openInMaps(place.name, { latitude: place.latitude, longitude: place.longitude }).catch(() =>
-      openViaUrl(place)
+      openViaUrl(place),
     );
     return;
   }

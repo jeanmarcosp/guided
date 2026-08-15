@@ -19,9 +19,15 @@ export default function GuideSettingsScreen() {
   const close = () => (router.canGoBack() ? router.back() : router.replace('/'));
 
   return (
-    <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]} edges={['bottom']}>
+    <SafeAreaView
+      style={[styles.container, { backgroundColor: colors.background }]}
+      edges={['bottom']}
+    >
       <View style={styles.header}>
-        <Text numberOfLines={1} style={[typography.title, styles.headerTitle, { color: colors.textPrimary }]}>
+        <Text
+          numberOfLines={1}
+          style={[typography.title, styles.headerTitle, { color: colors.textPrimary }]}
+        >
           {guide?.name ?? 'Guide'}
         </Text>
         <Pressable onPress={close} hitSlop={10}>
@@ -32,7 +38,9 @@ export default function GuideSettingsScreen() {
       {guide ? (
         <GuideInfo guide={guide} />
       ) : (
-        <Text style={[typography.body, styles.missing, { color: colors.textSecondary }]}>Guide not found.</Text>
+        <Text style={[typography.body, styles.missing, { color: colors.textSecondary }]}>
+          Guide not found.
+        </Text>
       )}
     </SafeAreaView>
   );
@@ -46,8 +54,8 @@ function GuideInfo({ guide }: { guide: Guide }) {
   const shared = guide.role === 'viewer' || guide.role === 'editor';
   // Owned/local guides were created by the current user; shared guides by their owner.
   const meName = profile?.display_name?.trim() || profile?.email || user?.email || 'You';
-  const createdByName = shared ? guide.ownerName ?? 'Unknown' : meName;
-  const createdBySeed = shared ? guide.ownerId : guide.ownerId ?? user?.id ?? 'me';
+  const createdByName = shared ? (guide.ownerName ?? 'Unknown') : meName;
+  const createdBySeed = shared ? guide.ownerId : (guide.ownerId ?? user?.id ?? 'me');
   const createdOn = new Date(guide.createdAt).toLocaleDateString(undefined, {
     year: 'numeric',
     month: 'long',
@@ -55,7 +63,10 @@ function GuideInfo({ guide }: { guide: Guide }) {
   });
 
   return (
-    <ScrollView contentContainerStyle={{ paddingBottom: spacing.xl }} showsVerticalScrollIndicator={false}>
+    <ScrollView
+      contentContainerStyle={{ paddingBottom: spacing.xl }}
+      showsVerticalScrollIndicator={false}
+    >
       <Section label="CREATED BY">
         <PersonCard name={createdByName} seed={createdBySeed} you={!shared} />
       </Section>
@@ -63,11 +74,15 @@ function GuideInfo({ guide }: { guide: Guide }) {
       {(guide.role === 'owner' || shared) && <MembersSection guideId={guide.id} />}
 
       <Section label="CREATED ON">
-        <View style={[styles.card, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+        <View
+          style={[styles.card, { backgroundColor: colors.surface, borderColor: colors.border }]}
+        >
           <View style={[styles.iconWrap, { backgroundColor: colors.surfaceAlt }]}>
             <Ionicons name="calendar-outline" size={18} color={colors.textSecondary} />
           </View>
-          <Text style={[typography.body, styles.cardText, { color: colors.textPrimary }]}>{createdOn}</Text>
+          <Text style={[typography.body, styles.cardText, { color: colors.textPrimary }]}>
+            {createdOn}
+          </Text>
         </View>
       </Section>
     </ScrollView>
@@ -109,7 +124,10 @@ function MembersSection({ guideId }: { guideId: string }) {
               style={[styles.card, { backgroundColor: colors.surface, borderColor: colors.border }]}
             >
               <Avatar name={m.name} seed={m.userId} size={36} />
-              <Text numberOfLines={1} style={[typography.body, styles.cardText, { color: colors.textPrimary }]}>
+              <Text
+                numberOfLines={1}
+                style={[typography.body, styles.cardText, { color: colors.textPrimary }]}
+              >
                 {m.name}
                 {m.userId === meId && <Text style={{ color: colors.textTertiary }}> (You)</Text>}
               </Text>
@@ -129,7 +147,10 @@ function PersonCard({ name, seed, you }: { name: string; seed?: string | null; y
   return (
     <View style={[styles.card, { backgroundColor: colors.surface, borderColor: colors.border }]}>
       <Avatar name={name} seed={seed} size={36} />
-      <Text numberOfLines={1} style={[typography.body, styles.cardText, { color: colors.textPrimary }]}>
+      <Text
+        numberOfLines={1}
+        style={[typography.body, styles.cardText, { color: colors.textPrimary }]}
+      >
         {name}
         {you && <Text style={{ color: colors.textTertiary }}> (You)</Text>}
       </Text>
@@ -141,7 +162,9 @@ function Section({ label, children }: { label: string; children: React.ReactNode
   const colors = useColors();
   return (
     <>
-      <Text style={[typography.caption, styles.sectionLabel, { color: colors.textTertiary }]}>{label}</Text>
+      <Text style={[typography.caption, styles.sectionLabel, { color: colors.textTertiary }]}>
+        {label}
+      </Text>
       {children}
     </>
   );
