@@ -141,7 +141,7 @@ export default function SearchScreen() {
         <View style={styles.center}>
           <Ionicons name="search" size={28} color={colors.textTertiary} />
           <Text style={[typography.body, { color: colors.textSecondary, textAlign: 'center' }]}>
-            Results are near the map's current area. Pan the map to another city to
+            Results are near the map&apos;s current area. Pan the map to another city to
             search there.
           </Text>
         </View>
@@ -189,7 +189,7 @@ const styles = StyleSheet.create({
     height: 40,
     borderRadius: radius.sm,
   },
-  input: { flex: 1, fontSize: 16, paddingVertical: 0 },
+  input: { flex: 1, fontSize: 16, paddingVertical: 0, letterSpacing: 0 }, // letterSpacing guards vs RN#42589
   center: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: spacing.md, paddingHorizontal: spacing.xxl },
   sep: { height: StyleSheet.hairlineWidth, marginLeft: 50 },
 });

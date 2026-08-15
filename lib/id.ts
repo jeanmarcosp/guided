@@ -1,6 +1,10 @@
-/** Lightweight unique id — sufficient for local, single-device storage. */
+import * as Crypto from 'expo-crypto';
+
+/**
+ * Globally-unique v4 UUID. Client-issued UUIDs double as the server primary key,
+ * so optimistic local writes and their backend rows share one id — no temp-id
+ * reconciliation needed on sync.
+ */
 export function uid(): string {
-  return (
-    Date.now().toString(36) + Math.random().toString(36).slice(2, 10)
-  );
+  return Crypto.randomUUID();
 }

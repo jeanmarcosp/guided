@@ -35,7 +35,8 @@
           "locationWhenInUsePermission": "Guided uses your location to center the map and find places near you."
         }
       ],
-      "expo-font"
+      "expo-font",
+      "expo-secure-store"
     ]
   }
 }

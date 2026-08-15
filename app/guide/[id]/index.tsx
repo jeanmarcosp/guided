@@ -2,7 +2,7 @@ import BottomSheet, { BottomSheetSectionList } from '@gorhom/bottom-sheet';
 import { Ionicons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
 import * as Location from 'expo-location';
-import { useLocalSearchParams, useRouter } from 'expo-router';
+import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Alert, Pressable, StyleSheet, Text, View } from 'react-native';
 import { MenuView, type MenuAction } from '@react-native-menu/menu';
@@ -13,6 +13,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import GuideMap from '@/components/GuideMap';
 import PlaceRow from '@/components/PlaceRow';
 import { openPlaceInAppleMaps } from '@/lib/maps';
+import { refreshSharedGuides } from '@/lib/sync/guidesSync';
 import type { Layer, Place } from '@/lib/types';
 import { useGuides } from '@/store/guides';
 import { radius, spacing, typography, useColors } from '@/theme/tokens';
@@ -53,6 +54,21 @@ export default function GuideDetail() {
   const snapPoints = useMemo(() => [120, '45%', '90%'], []);
   const places = guide?.places ?? [];
   const layers = useMemo(() => guide?.layers ?? [], [guide?.layers]);
+
+  // A guide shared with you as a viewer is read-only; owners (and un-synced
+  // local guides, role undefined) can edit and share.
+  const canEdit = guide?.role !== 'viewer';
+  const isSharedGuide = guide?.role === 'viewer' || guide?.role === 'editor';
+
+  // No realtime yet (phase 2): re-pull shared guides each time this screen is
+  // focused so the owner's added/removed places show up for the viewer.
+  useFocusEffect(
+    useCallback(() => {
+      if (isSharedGuide) void refreshSharedGuides();
+    }, [isSharedGuide])
+  );
+  const placesLabel =
+    places.length === 0 ? 'No places yet' : `${places.length} place${places.length === 1 ? '' : 's'}`;
 
   const layerColors = useMemo(
     () => Object.fromEntries(layers.map((l) => [l.id, l.color])),
@@ -168,8 +184,9 @@ export default function GuideDetail() {
 
   // Native (liquid-glass) long-press menu for a place: open in Maps, move layer, remove.
   function placeMenuActions(place: Place): MenuAction[] {
-    const targets = layers.filter((l) => l.id !== place.layerId);
     const actions: MenuAction[] = [{ id: 'open', title: 'Open in Apple Maps' }];
+    if (!canEdit) return actions; // viewers can open but not modify
+    const targets = layers.filter((l) => l.id !== place.layerId);
     if (targets.length > 0) {
       actions.push({
         id: 'move',
@@ -323,6 +340,13 @@ export default function GuideDetail() {
             {guide.name}
           </Text>
         </View>
+        <Pressable
+          onPress={() => router.push(`/guide/${guide.id}/settings`)}
+          style={[styles.circleBtn, { backgroundColor: colors.surface }]}
+          hitSlop={8}
+        >
+          <Ionicons name="settings-outline" size={20} color={colors.textPrimary} />
+        </Pressable>
       </View>
 
       {/* "Search this area" pill — appears after the user pans the map */}
@@ -376,27 +400,42 @@ export default function GuideDetail() {
         handleIndicatorStyle={{ backgroundColor: colors.handle }}
       >
         <View style={styles.sheetHeader}>
-          <View>
-            <Text style={[typography.title, { color: colors.textPrimary }]}>{guide.name}</Text>
-            <Text style={[typography.caption, { color: colors.textSecondary }]}>
-              {places.length === 0 ? 'No places yet' : `${places.length} place${places.length === 1 ? '' : 's'}`}
+          <View style={styles.sheetHeaderText}>
+            <Text numberOfLines={1} style={[typography.title, { color: colors.textPrimary }]}>
+              {guide.name}
+            </Text>
+            <Text numberOfLines={1} style={[typography.caption, { color: colors.textSecondary }]}>
+              {placesLabel}
             </Text>
           </View>
           <View style={styles.headerActions}>
-            <Pressable
-              onPress={() => router.push(`/guide/${guide.id}/layers`)}
-              style={({ pressed }) => [styles.iconBtn, { backgroundColor: colors.surfaceAlt }, pressed && { opacity: 0.6 }]}
-              hitSlop={6}
-            >
-              <Ionicons name="layers-outline" size={20} color={colors.textPrimary} />
-            </Pressable>
-            <Pressable
-              onPress={openSearch}
-              style={({ pressed }) => [styles.addPlace, { backgroundColor: colors.accent }, pressed && { opacity: 0.8 }]}
-            >
-              <Ionicons name="add" size={18} color="#fff" />
-              <Text style={[typography.bodyMedium, { color: '#fff' }]}>Add</Text>
-            </Pressable>
+            {canEdit && (
+              <Pressable
+                onPress={() => router.push(`/guide/${guide.id}/share`)}
+                style={({ pressed }) => [styles.iconBtn, { backgroundColor: colors.surfaceAlt }, pressed && { opacity: 0.6 }]}
+                hitSlop={6}
+              >
+                <Ionicons name="share-outline" size={20} color={colors.textPrimary} />
+              </Pressable>
+            )}
+            {canEdit && (
+              <Pressable
+                onPress={() => router.push(`/guide/${guide.id}/layers`)}
+                style={({ pressed }) => [styles.iconBtn, { backgroundColor: colors.surfaceAlt }, pressed && { opacity: 0.6 }]}
+                hitSlop={6}
+              >
+                <Ionicons name="layers-outline" size={20} color={colors.textPrimary} />
+              </Pressable>
+            )}
+            {canEdit && (
+              <Pressable
+                onPress={openSearch}
+                style={({ pressed }) => [styles.addPlace, { backgroundColor: colors.accent }, pressed && { opacity: 0.8 }]}
+              >
+                <Ionicons name="add" size={18} color="#fff" />
+                <Text style={[typography.bodyMedium, { color: '#fff' }]}>Add</Text>
+              </Pressable>
+            )}
           </View>
         </View>
 
@@ -488,6 +527,7 @@ export default function GuideDetail() {
                 color={section.layer.color}
                 onPress={() => focusPlace(item)}
                 onDelete={() => removePlaceFromGuide(guide.id, item.id)}
+                readOnly={!canEdit}
               />
             </MenuView>
           )}
@@ -578,6 +618,7 @@ const styles = StyleSheet.create({
     paddingTop: spacing.xs,
     paddingBottom: spacing.md,
   },
+  sheetHeaderText: { flex: 1, marginRight: spacing.md },
   headerActions: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
   toolbar: {
     flexDirection: 'row',

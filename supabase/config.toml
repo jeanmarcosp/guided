@@ -1,0 +1,40 @@
+# Supabase local dev config. Regenerate with `supabase init` if your CLI version
+# expects a different shape; the important custom bits are the [auth] providers
+# and the JWT-verified edge function below.
+project_id = "guided"
+
+[api]
+enabled = true
+port = 54321
+schemas = ["public"]
+extra_search_path = ["public", "extensions"]
+max_rows = 1000
+
+[db]
+port = 54322
+major_version = 15
+
+[studio]
+enabled = true
+port = 54323
+
+[auth]
+enabled = true
+site_url = "guided://"
+additional_redirect_urls = ["guided://callback", "guided://share"]
+jwt_expiry = 3600
+enable_refresh_token_rotation = true
+
+[auth.email]
+enable_signup = true
+# Magic-link / OTP sign-in (no passwords).
+enable_confirmations = false
+
+[auth.external.apple]
+enabled = true
+# Fill these from your Apple Developer account (see ONBOARDING / setup checklist).
+client_id = "env(SUPABASE_AUTH_APPLE_CLIENT_ID)"
+secret = "env(SUPABASE_AUTH_APPLE_SECRET)"
+
+[functions.foursquare-search]
+verify_jwt = true

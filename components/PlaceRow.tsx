@@ -25,9 +25,11 @@ type Props = {
   onLongPress?: () => void;
   /** Immediate delete (swipe action). */
   onDelete: () => void;
+  /** Disable swipe-to-delete (e.g. a guide shared with you as a viewer). */
+  readOnly?: boolean;
 };
 
-export default function PlaceRow({ place, color, onPress, onLongPress, onDelete }: Props) {
+export default function PlaceRow({ place, color, onPress, onLongPress, onDelete, readOnly }: Props) {
   const colors = useColors();
 
   const translateX = useSharedValue(0);
@@ -60,6 +62,7 @@ export default function PlaceRow({ place, color, onPress, onLongPress, onDelete 
   useEffect(() => clearIfCurrent, [clearIfCurrent]);
 
   const pan = Gesture.Pan()
+    .enabled(!readOnly)
     .activeOffsetX([-12, 12]) // only engage on a clearly horizontal drag
     .failOffsetY([-12, 12]) // let vertical scroll / sheet drag win
     .onStart(() => {

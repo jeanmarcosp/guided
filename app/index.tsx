@@ -1,8 +1,8 @@
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
-import { useRouter } from 'expo-router';
-import { useMemo, useState, type ReactNode } from 'react';
-import { ActionSheetIOS, Alert, FlatList, Pressable, StyleSheet, Text, View } from 'react-native';
+import { useFocusEffect, useRouter } from 'expo-router';
+import { useCallback, useMemo, useState, type ReactNode } from 'react';
+import { Alert, FlatList, Pressable, StyleSheet, Text, View } from 'react-native';
 import {
   NestedReorderableList,
   ScrollViewContainer,
@@ -13,13 +13,18 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import GuideCard from '@/components/GuideCard';
 import GuideEditor, { type GuideDraft } from '@/components/GuideEditor';
 import SwipeActionRow, { type SwipeAction } from '@/components/SwipeActionRow';
+import { refreshSharedGuides } from '@/lib/sync/guidesSync';
 import type { Guide } from '@/lib/types';
 import { useGuides } from '@/store/guides';
-import { useSettings, type ThemeMode } from '@/store/settings';
 import { GUIDE_COLORS, GUIDE_EMOJIS, radius, spacing, typography, useColors } from '@/theme/tokens';
 
 type EditorState = { mode: 'create'; draft: GuideDraft } | { mode: 'edit'; id: string; draft: GuideDraft };
-type Row = { type: 'header'; label: string } | { type: 'guide'; guide: Guide };
+type Row =
+  | { type: 'header'; label: string }
+  | { type: 'guide'; guide: Guide; shared?: boolean };
+
+/** A guide shared with the user (not owned). */
+const isShared = (g: Guide) => g.role === 'viewer' || g.role === 'editor';
 
 export default function GuidesHome() {
   const colors = useColors();
@@ -32,15 +37,26 @@ export default function GuidesHome() {
   const deleteGuide = useGuides((s) => s.deleteGuide);
   const togglePinGuide = useGuides((s) => s.togglePinGuide);
   const setGuidesOrder = useGuides((s) => s.setGuidesOrder);
-  const themeMode = useSettings((s) => s.themeMode);
-  const setThemeMode = useSettings((s) => s.setThemeMode);
 
   const [editor, setEditor] = useState<EditorState | null>(null);
   const [reordering, setReordering] = useState(false);
   const editingGuide = editor?.mode === 'edit' ? guides.find((g) => g.id === editor.id) : undefined;
 
-  const pinnedList = useMemo(() => guides.filter((g) => g.pinned), [guides]);
-  const restList = useMemo(() => guides.filter((g) => !g.pinned), [guides]);
+  // Owned guides drive pinning/reordering; shared guides are read-only.
+  const ownedGuides = useMemo(() => guides.filter((g) => !isShared(g)), [guides]);
+  const sharedGuides = useMemo(() => guides.filter(isShared), [guides]);
+
+  const pinnedList = useMemo(() => ownedGuides.filter((g) => g.pinned), [ownedGuides]);
+  const restList = useMemo(() => ownedGuides.filter((g) => !g.pinned), [ownedGuides]);
+
+  // No realtime yet (phase 2): refresh shared guides whenever home is focused,
+  // so a viewer picks up the owner's edits on return without a restart.
+  const hasShared = sharedGuides.length > 0;
+  useFocusEffect(
+    useCallback(() => {
+      if (hasShared) void refreshSharedGuides();
+    }, [hasShared])
+  );
 
   // Flat rows (with interleaved section headers) for the normal, swipeable list.
   const rows = useMemo<Row[]>(() => {
@@ -54,31 +70,17 @@ export default function GuidesHome() {
       if (hasPins) r.push({ type: 'header', label: 'ALL GUIDES' });
       restList.forEach((g) => r.push({ type: 'guide', guide: g }));
     }
+    if (sharedGuides.length > 0) {
+      r.push({ type: 'header', label: 'SHARED WITH ME' });
+      sharedGuides.forEach((g) => r.push({ type: 'guide', guide: g, shared: true }));
+    }
     return r;
-  }, [pinnedList, restList]);
+  }, [pinnedList, restList, sharedGuides]);
 
   const stickyIndices = useMemo(
     () => rows.map((row, i) => (row.type === 'header' ? i : -1)).filter((i) => i >= 0),
     [rows]
   );
-
-  function chooseAppearance() {
-    const modes: { key: ThemeMode; label: string }[] = [
-      { key: 'system', label: 'System' },
-      { key: 'light', label: 'Light' },
-      { key: 'dark', label: 'Dark' },
-    ];
-    const options = [...modes.map((m) => (m.key === themeMode ? `✓  ${m.label}` : m.label)), 'Cancel'];
-    ActionSheetIOS.showActionSheetWithOptions(
-      { title: 'Appearance', options, cancelButtonIndex: options.length - 1 },
-      (i) => {
-        if (i < modes.length) {
-          Haptics.selectionAsync();
-          setThemeMode(modes[i].key);
-        }
-      }
-    );
-  }
 
   function handleCreate() {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
@@ -179,6 +181,16 @@ export default function GuidesHome() {
   const renderNormalItem = ({ item }: { item: Row }) => {
     if (item.type === 'header') return <SectionHeader label={item.label} />;
     const g = item.guide;
+    // Shared guides are read-only: tap to open, no pin/delete/edit affordances.
+    if (item.shared) {
+      return (
+        <View style={styles.guideSpacer}>
+          <Pressable onPress={() => router.push(`/guide/${g.id}`)}>
+            <GuideCard guide={g} />
+          </Pressable>
+        </View>
+      );
+    }
     return (
       <View style={styles.guideSpacer}>
         <SwipeActionRow
@@ -247,13 +259,13 @@ export default function GuidesHome() {
           ) : (
             <>
               <Pressable
-                onPress={chooseAppearance}
+                onPress={() => router.push('/settings')}
                 style={({ pressed }) => [styles.iconBtn, { backgroundColor: colors.surface, borderColor: colors.border }, pressed && { opacity: 0.6 }]}
                 hitSlop={8}
               >
-                <Ionicons name="contrast-outline" size={20} color={colors.textPrimary} />
+                <Ionicons name="person-circle-outline" size={22} color={colors.textPrimary} />
               </Pressable>
-              {guides.length > 1 && (
+              {ownedGuides.length > 1 && (
                 <Pressable
                   onPress={() => setReordering(true)}
                   style={({ pressed }) => [styles.iconBtn, { backgroundColor: colors.surface, borderColor: colors.border }, pressed && { opacity: 0.6 }]}

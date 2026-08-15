@@ -1,7 +1,7 @@
 import { Ionicons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import {
   Alert,
   Keyboard,
@@ -467,6 +467,7 @@ const styles = StyleSheet.create({
     borderRadius: radius.sm,
     paddingHorizontal: spacing.md,
     fontSize: 16,
+    letterSpacing: 0, // guards placeholder against RN#42589 letterSpacing bleed
   },
   label: { letterSpacing: 0.5, marginTop: spacing.xs },
   swatchRow: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm },

@@ -7,6 +7,7 @@ export type Place = {
   category?: string; // raw category from search, used for auto-routing
   addedAt: number;
   layerId?: string; // which layer this place belongs to
+  addedBy?: string; // server user id of who added it (collaboration attribution)
 };
 
 export type Layer = {
@@ -20,6 +21,9 @@ export type Layer = {
   collapsed?: boolean; // section collapsed in the list (does not hide pins)
 };
 
+/** The caller's relationship to a guide. Undefined for purely local guides. */
+export type GuideRole = 'owner' | 'editor' | 'viewer';
+
 export type Guide = {
   id: string;
   name: string;
@@ -29,4 +33,10 @@ export type Guide = {
   createdAt: number;
   layers?: Layer[];
   pinned?: boolean;
+  /** Server owner (auth user id). Undefined for un-synced local guides. */
+  ownerId?: string;
+  /** Caller's role for this guide; drives read-only vs editable UI. */
+  role?: GuideRole;
+  /** Owner's display name or email — set only for guides shared with the caller. */
+  ownerName?: string;
 };
