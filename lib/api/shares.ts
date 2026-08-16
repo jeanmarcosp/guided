@@ -94,6 +94,15 @@ export async function listShares(guideId: string): Promise<ShareRow[]> {
   return (data ?? []) as ShareRow[];
 }
 
+/** Change a member's role (owner only, per RLS). Propagates to them via Realtime. */
+export async function updateShareRole(
+  shareId: string,
+  role: Exclude<GuideRole, 'owner'>,
+): Promise<void> {
+  const { error } = await supabase.from('guide_shares').update({ role }).eq('id', shareId);
+  if (error) throw error;
+}
+
 export async function revokeShare(shareId: string): Promise<void> {
   const { error } = await supabase.from('guide_shares').delete().eq('id', shareId);
   if (error) throw error;

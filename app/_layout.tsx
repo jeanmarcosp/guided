@@ -63,8 +63,8 @@ export default function RootLayout() {
     else if (status === 'signedOut') teardownSignedOut();
   }, [status]);
 
-  // No realtime yet (phase 2): pull the latest shared guides when the app
-  // returns to the foreground so a viewer sees the owner's edits.
+  // Realtime is the primary path for live updates; this foreground refresh is a
+  // reconnection catch-up that reconciles any events missed while backgrounded.
   useEffect(() => {
     const sub = AppState.addEventListener('change', (next) => {
       if (next === 'active' && useAuth.getState().status === 'signedIn') {

@@ -24,6 +24,9 @@ export type Layer = {
 /** The caller's relationship to a guide. Undefined for purely local guides. */
 export type GuideRole = 'owner' | 'editor' | 'viewer';
 
+/** A person with access to a guide (owner or accepted member) — for avatars. */
+export type GuideAccessMember = { userId: string; name: string };
+
 export type Guide = {
   id: string;
   name: string;
@@ -39,4 +42,6 @@ export type Guide = {
   role?: GuideRole;
   /** Owner's display name or email — set only for guides shared with the caller. */
   ownerName?: string;
+  /** Other people with access (owner + accepted members, excluding self). Set by fetchGuides. */
+  members?: GuideAccessMember[];
 };

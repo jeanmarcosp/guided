@@ -53,6 +53,12 @@ export default function ManageLayers() {
 
   const guide = useGuides((s) => s.guides.find((g) => g.id === id));
   const addLayer = useGuides((s) => s.addLayer);
+
+  // Editing layers is for owners/editors only. The entry button is hidden for
+  // viewers; this guards a stray deep link into the modal.
+  useEffect(() => {
+    if (guide?.role === 'viewer') router.back();
+  }, [guide?.role, router]);
   const updateLayer = useGuides((s) => s.updateLayer);
   const deleteLayer = useGuides((s) => s.deleteLayer);
   const moveLayerIndex = useGuides((s) => s.moveLayerIndex);

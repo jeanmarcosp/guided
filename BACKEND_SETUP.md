@@ -89,8 +89,44 @@ npx expo run:ios          # dev build with Apple Sign In + deep links
 - **Sign out** (⚙ button on the guides screen) clears local data; signing back in
   re-hydrates from the cloud.
 
-## What's next (Phase 2 — collaborative editing)
+## Phase 2 — collaborative editing (editors + realtime)
 
-Schema already supports it (`role`, `added_by`, dedupe index). Phase 2 adds
-editor-role RLS on `places`, Supabase Realtime subscriptions, and enables the Add
-button for editors — no schema rewrite needed.
+Phase 2 is in the code: a user who accepts an **editor** share link can add/edit/
+delete places and layers, and all collaborators see changes **live** via Supabase
+Realtime. It's additive — no schema rewrite. To turn it on:
+
+1. **Apply the new migrations** (`0009`, `0010`, `0011`):
+   ```bash
+   supabase db push
+   ```
+   `0009` adds the `can_edit_guide()` helper and editor write policies on `places`
+   / `layers` (guides + sharing stay owner-only). `0010` publishes guides/layers/
+   places for Realtime. `0011` sets `REPLICA IDENTITY FULL` (so deletes and revokes
+   propagate under RLS) and publishes `guide_shares` (so viewer↔editor role changes
+   reach the affected member live). Re-run `supabase db push` whenever you pull new
+   migrations — already-applied files are skipped.
+2. **Confirm Realtime is on** for the project (Supabase **Database → Replication**,
+   or **Realtime** settings). Publishing the tables is the DB-side switch; the
+   project-level Realtime feature is enabled by default.
+
+**Troubleshooting — a promoted editor still sees no Add button:** their device is
+holding a stale `viewer` role. Make sure `0011` is applied (it publishes
+`guide_shares`, the channel that delivers role changes) and that the member was
+promoted from the **member list** on the Share screen (tap their role → Can edit),
+not by toggling the create-link segment (that only sets the role of _new_ links).
+Backgrounding and reopening the app also reconciles the role via the foreground
+refresh.
+
+Verify (needs two accounts on dev builds):
+
+- Open a guide → Share → toggle **Editor** → send the link. The second account opens
+  `guided://share/<token>` → the guide appears under **Shared with me** with **Add**
+  and **Layers** available and **no Share button** (editors can't re-share).
+- Editor adds/edits/removes a place or layer → it appears on the owner's device
+  **without reopening** (realtime), and vice-versa.
+- Guide cards show a cluster of avatars for the other people with access
+  (everyone but you) — on both shared-with-me and owned-and-shared guides.
+- A **Viewer** link stays fully read-only (no Add / Layers / swipe-delete).
+- On the Share screen, tap a member's role to switch them between **Can view** and
+  **Can edit** (or remove them). The change reaches that person live — a promoted
+  viewer gets Add/Layers without reopening; a demoted editor loses them.

@@ -1,4 +1,4 @@
-import type { Guide, GuideRole, Layer, Place } from '@/lib/types';
+import type { Guide, GuideAccessMember, GuideRole, Layer, Place } from '@/lib/types';
 
 // ---------------------------------------------------------------------------
 // Database row shapes (snake_case, as returned by Supabase)
@@ -81,6 +81,7 @@ export function guideRowsToGuide(
   places: PlaceRow[],
   role: GuideRole,
   ownerName?: string,
+  members: GuideAccessMember[] = [],
 ): Guide {
   return {
     id: guide.id,
@@ -92,6 +93,7 @@ export function guideRowsToGuide(
     ownerId: guide.owner_id,
     role,
     ownerName,
+    members,
     layers: [...layers].sort((a, b) => a.sort_order - b.sort_order).map(layerRowToLayer),
     places: [...places].sort((a, b) => ms(a.created_at) - ms(b.created_at)).map(placeRowToPlace),
   };

@@ -2,7 +2,7 @@ import BottomSheet, { BottomSheetSectionList } from '@gorhom/bottom-sheet';
 import { Ionicons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
 import * as Location from 'expo-location';
-import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
+import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Alert, Pressable, StyleSheet, Text, useWindowDimensions, View } from 'react-native';
 import { MenuView, type MenuAction } from '@react-native-menu/menu';
@@ -13,7 +13,6 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import GuideMap from '@/components/GuideMap';
 import PlaceRow from '@/components/PlaceRow';
 import { openPlaceInAppleMaps } from '@/lib/maps';
-import { refreshSharedGuides } from '@/lib/sync/guidesSync';
 import type { Layer, Place } from '@/lib/types';
 import { useGuides } from '@/store/guides';
 import { radius, spacing, typography, useColors } from '@/theme/tokens';
@@ -70,18 +69,13 @@ export default function GuideDetail() {
   const places = useMemo(() => guide?.places ?? [], [guide?.places]);
   const layers = useMemo(() => guide?.layers ?? [], [guide?.layers]);
 
-  // A guide shared with you as a viewer is read-only; owners (and un-synced
-  // local guides, role undefined) can edit and share.
+  // A guide shared with you as a viewer is read-only; editors and owners can add,
+  // edit, and remove places/layers. Only the owner (or an un-synced local guide,
+  // role undefined) can share it — editors can't re-share. Live updates arrive
+  // via Realtime (lib/sync/realtime.ts), so no focus-based refresh here.
   const canEdit = guide?.role !== 'viewer';
-  const isSharedGuide = guide?.role === 'viewer' || guide?.role === 'editor';
+  const isOwner = guide?.role === 'owner' || guide?.role === undefined;
 
-  // No realtime yet (phase 2): re-pull shared guides each time this screen is
-  // focused so the owner's added/removed places show up for the viewer.
-  useFocusEffect(
-    useCallback(() => {
-      if (isSharedGuide) void refreshSharedGuides();
-    }, [isSharedGuide]),
-  );
   const placesLabel =
     places.length === 0
       ? 'No places yet'
@@ -457,7 +451,7 @@ export default function GuideDetail() {
             </Text>
           </View>
           <View style={styles.headerActions}>
-            {canEdit && (
+            {isOwner && (
               <Pressable
                 onPress={() => router.push(`/guide/${guide.id}/share`)}
                 style={({ pressed }) => [

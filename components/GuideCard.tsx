@@ -1,6 +1,6 @@
 import { Ionicons } from '@expo/vector-icons';
 import { StyleSheet, Text, View } from 'react-native';
-import Avatar from '@/components/Avatar';
+import AvatarCluster from '@/components/AvatarCluster';
 import type { Guide } from '@/lib/types';
 import { radius, spacing, typography, useColors } from '@/theme/tokens';
 
@@ -11,8 +11,9 @@ type Props = { guide: Guide };
 export default function GuideCard({ guide }: Props) {
   const colors = useColors();
   const count = guide.places.length;
-  const shared = guide.role === 'viewer' || guide.role === 'editor';
   const countLabel = count === 0 ? 'No places yet' : `${count} place${count === 1 ? '' : 's'}`;
+  const members = guide.members ?? [];
+  const showMembers = members.length > 0;
 
   return (
     <View style={[styles.card, { backgroundColor: colors.surface, borderColor: colors.border }]}>
@@ -29,7 +30,7 @@ export default function GuideCard({ guide }: Props) {
         </Text>
       </View>
 
-      {shared && <Avatar name={guide.ownerName} seed={guide.ownerId} />}
+      {showMembers && <AvatarCluster members={members} />}
 
       <Ionicons name="chevron-forward" size={20} color={colors.textTertiary} />
     </View>
