@@ -8,7 +8,7 @@ import Avatar from '@/components/Avatar';
 import {
   createShareLink,
   listShares,
-  resolveProfileNames,
+  resolveProfiles,
   revokeShare,
   updateShareRole,
   type ShareRow,
@@ -16,7 +16,7 @@ import {
 import { useGuides } from '@/store/guides';
 import { radius, spacing, typography, useColors } from '@/theme/tokens';
 
-type Member = ShareRow & { name: string };
+type Member = ShareRow & { name: string; avatarUrl: string | null; avatarColor: string | null };
 
 export default function ShareGuideScreen() {
   const colors = useColors();
@@ -48,8 +48,18 @@ export default function ShareGuideScreen() {
       const memberRows = rows.filter(
         (r): r is ShareRow & { shared_with: string } => r.shared_with !== null,
       );
-      const nameById = await resolveProfileNames(memberRows.map((r) => r.shared_with));
-      setMembers(memberRows.map((r) => ({ ...r, name: nameById.get(r.shared_with) ?? 'Member' })));
+      const cardById = await resolveProfiles(memberRows.map((r) => r.shared_with));
+      setMembers(
+        memberRows.map((r) => {
+          const card = cardById.get(r.shared_with);
+          return {
+            ...r,
+            name: card?.name ?? 'Member',
+            avatarUrl: card?.avatarUrl ?? null,
+            avatarColor: card?.avatarColor ?? null,
+          };
+        }),
+      );
     } catch (e: any) {
       Alert.alert('Could not load sharing', e?.message ?? 'Please try again.');
     } finally {
@@ -195,7 +205,13 @@ export default function ShareGuideScreen() {
       ) : (
         members.map((m) => (
           <View key={m.id} style={[styles.memberRow, { borderBottomColor: colors.border }]}>
-            <Avatar name={m.name} seed={m.shared_with} size={36} />
+            <Avatar
+              name={m.name}
+              seed={m.shared_with}
+              size={36}
+              imageUri={m.avatarUrl}
+              color={m.avatarColor}
+            />
             <View style={styles.memberInfo}>
               <Text numberOfLines={1} style={[typography.body, { color: colors.textPrimary }]}>
                 {m.name}

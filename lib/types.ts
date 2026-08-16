@@ -25,7 +25,12 @@ export type Layer = {
 export type GuideRole = 'owner' | 'editor' | 'viewer';
 
 /** A person with access to a guide (owner or accepted member) — for avatars. */
-export type GuideAccessMember = { userId: string; name: string };
+export type GuideAccessMember = {
+  userId: string;
+  name: string;
+  avatarUrl?: string | null;
+  avatarColor?: string | null;
+};
 
 export type Guide = {
   id: string;

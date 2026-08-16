@@ -14,6 +14,8 @@ import { radius, spacing, typography, useColors } from '@/theme/tokens';
 const ACTION_WIDTH = 88;
 const REVEAL_SNAP = ACTION_WIDTH; // resting open position
 const FULL_SWIPE_RATIO = 0.62; // fraction of row width that triggers delete
+const VISITED_GREEN = '#34C759'; // iOS system green — "been here" check
+const VISITED_DIM = 0.5; // fade a visited row so unvisited places stand out
 
 // Module-level controller so only ONE row stays open at a time.
 let closeOpenRow: (() => void) | null = null;
@@ -27,6 +29,8 @@ type Props = {
   onDelete: () => void;
   /** Disable swipe-to-delete (e.g. a guide shared with you as a viewer). */
   readOnly?: boolean;
+  /** This user has marked the place visited — dim it and show a check. */
+  visited?: boolean;
 };
 
 export default function PlaceRow({
@@ -36,6 +40,7 @@ export default function PlaceRow({
   onLongPress,
   onDelete,
   readOnly,
+  visited,
 }: Props) {
   const colors = useColors();
 
@@ -127,11 +132,11 @@ export default function PlaceRow({
             onLongPress={onLongPress}
             style={({ pressed }) => [styles.row, pressed && { opacity: 0.6 }]}
           >
-            <View style={[styles.dot, { backgroundColor: color }]}>
+            <View style={[styles.dot, { backgroundColor: color }, visited && styles.dimmed]}>
               <Ionicons name="location-sharp" size={16} color="#fff" />
             </View>
 
-            <View style={styles.body}>
+            <View style={[styles.body, visited && styles.dimmed]}>
               <Text
                 numberOfLines={1}
                 style={[typography.bodyMedium, { color: colors.textPrimary }]}
@@ -147,6 +152,15 @@ export default function PlaceRow({
                 </Text>
               )}
             </View>
+
+            {visited && (
+              <Ionicons
+                name="checkmark-circle"
+                size={20}
+                color={VISITED_GREEN}
+                style={styles.visitedCheck}
+              />
+            )}
           </Pressable>
         </Reanimated.View>
       </GestureDetector>
@@ -194,4 +208,6 @@ const styles = StyleSheet.create({
   },
   body: { flex: 1, gap: 1 },
   category: { textTransform: 'capitalize' },
+  dimmed: { opacity: VISITED_DIM },
+  visitedCheck: { marginLeft: spacing.sm },
 });

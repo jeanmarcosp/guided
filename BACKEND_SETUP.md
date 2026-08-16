@@ -130,3 +130,64 @@ Verify (needs two accounts on dev builds):
 - On the Share screen, tap a member's role to switch them between **Can view** and
   **Can edit** (or remove them). The change reaches that person live — a promoted
   viewer gets Add/Layers without reopening; a demoted editor loses them.
+
+## Personal "visited" marks
+
+Users can mark places they've **been to**. This is per-user **private** state —
+each person marks (and sees) only their own visits; collaborators never see each
+other's. It's stored server-side so it syncs across a user's devices.
+
+1. **Apply the migration** (`0012`):
+   ```bash
+   supabase db push
+   ```
+   `0012` adds `place_visits (user_id, place_id, visited_at)` with RLS that scopes
+   every row to `user_id = auth.uid()` — a user can only ever read/create/delete
+   their own marks. Rows cascade-delete when the place (or user) is removed. No
+   Realtime publication is needed: marks re-pull on sign-in and on app foreground.
+
+Verify (single account is enough):
+
+- Open a guide → long-press a place → **Visited**. The row dims with a green check
+  and the sheet subtitle shows "… · N visited". Long-press → **Visited** again to
+  clear it.
+- The mark survives a reload and appears on a second device after foregrounding.
+- A **viewer** on a shared guide can still mark places visited (it's personal),
+  even though they can't edit the guide.
+
+## Profile avatars (image or color)
+
+Users can set a profile picture or pick a background color for their initial
+avatar. Avatars show in the member cluster on guide cards, the guide-settings
+member list, and the share screen — so collaborators see each other's.
+
+1. **Apply the migrations** (`0013`, `0014`):
+   ```bash
+   supabase db push
+   ```
+   `0013` adds `profiles.avatar_color` and creates a **public-read** storage
+   bucket `avatars`. Storage policies confine writes to each user's own folder
+   (object name `{user_id}/avatar`), while reads are public so any collaborator
+   can load an avatar by URL. `0014` publishes `profiles` for Realtime so a
+   collaborator's avatar/name change reaches other members' clusters **live**
+   (RLS still gates delivery to people who share a guide). Re-run `supabase db
+   push` after pulling — applied migrations are skipped by filename.
+2. Nothing else to configure — the bucket and its policies are created by the
+   migration (no dashboard clicks). The app already requests photo-library
+   permission via the `expo-image-picker` config plugin (`app.json`).
+
+Verify (single account, on a **dev build** — the image picker is a native module):
+
+- **Settings → AVATAR → Choose Photo** → pick an image, then pinch/pan it inside
+  the **circular** cropper and tap **Use Photo**. The profile avatar updates
+  immediately; tap it again (or **Change Photo**) to replace it, **Remove** to
+  clear it. (Circular crop needs `expo-image-manipulator` — a native module, so
+  rebuild the dev build after pulling.)
+- **Or pick a color** → the initial avatar takes that color; the selected swatch
+  shows a check. Picking a color clears an uploaded photo (an avatar is one or
+  the other).
+- Share the guide with a second account → each sees the other's avatar in the
+  member cluster / people list. Changing one account's avatar updates the other's
+  cluster **live** (via `0014`'s profiles Realtime). Note the home cluster shows
+  *other* members, never yourself — so a single account won't see its own change
+  there. New members joining still appear on the next app foreground.

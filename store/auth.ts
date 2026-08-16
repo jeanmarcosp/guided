@@ -7,6 +7,7 @@ export type Profile = {
   email: string | null;
   display_name: string | null;
   avatar_url: string | null;
+  avatar_color: string | null;
 };
 
 export type AuthStatus = 'loading' | 'signedIn' | 'signedOut';
@@ -21,9 +22,11 @@ type AuthState = {
   signOut: () => Promise<void>;
   /** Persist the user's display name. */
   saveName: (name: string) => Promise<void>;
+  /** Patch profile columns (e.g. avatar_url / avatar_color) and update state. */
+  updateProfile: (patch: Partial<Pick<Profile, 'avatar_url' | 'avatar_color'>>) => Promise<void>;
 };
 
-const PROFILE_COLUMNS = 'id, email, display_name, avatar_url';
+const PROFILE_COLUMNS = 'id, email, display_name, avatar_url, avatar_color';
 
 async function fetchProfile(userId: string): Promise<Profile | null> {
   const { data } = await supabase
@@ -78,6 +81,19 @@ export const useAuth = create<AuthState>()((set, get) => ({
     const { data, error } = await supabase
       .from('profiles')
       .update({ display_name })
+      .eq('id', userId)
+      .select(PROFILE_COLUMNS)
+      .single();
+    if (error) throw error;
+    set({ profile: data as Profile });
+  },
+
+  updateProfile: async (patch) => {
+    const userId = get().user?.id;
+    if (!userId) return;
+    const { data, error } = await supabase
+      .from('profiles')
+      .update(patch)
       .eq('id', userId)
       .select(PROFILE_COLUMNS)
       .single();

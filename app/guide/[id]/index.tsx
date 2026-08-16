@@ -15,6 +15,7 @@ import PlaceRow from '@/components/PlaceRow';
 import { openPlaceInAppleMaps } from '@/lib/maps';
 import type { Layer, Place } from '@/lib/types';
 import { useGuides } from '@/store/guides';
+import { useVisits } from '@/store/visits';
 import { radius, spacing, typography, useColors } from '@/theme/tokens';
 
 const DEFAULT_REGION: Region = {
@@ -48,6 +49,10 @@ export default function GuideDetail() {
   const setAllLayersHidden = useGuides((s) => s.setAllLayersHidden);
   const setAllLayersCollapsed = useGuides((s) => s.setAllLayersCollapsed);
 
+  // Personal "visited" marks — private to this user (see store/visits.ts).
+  const visited = useVisits((s) => s.visited);
+  const toggleVisited = useVisits((s) => s.toggle);
+
   const mapRef = useRef<MapView>(null);
   const sheetRef = useRef<BottomSheet>(null);
   const mapReady = useRef(false);
@@ -76,10 +81,16 @@ export default function GuideDetail() {
   const canEdit = guide?.role !== 'viewer';
   const isOwner = guide?.role === 'owner' || guide?.role === undefined;
 
+  const visitedCount = useMemo(
+    () => places.reduce((n, p) => (visited[p.id] ? n + 1 : n), 0),
+    [places, visited],
+  );
+
   const placesLabel =
     places.length === 0
       ? 'No places yet'
-      : `${places.length} place${places.length === 1 ? '' : 's'}`;
+      : `${places.length} place${places.length === 1 ? '' : 's'}` +
+        (visitedCount > 0 ? ` · ${visitedCount} visited` : '');
 
   const layerColors = useMemo(
     () => Object.fromEntries(layers.map((l) => [l.id, l.color])),
@@ -206,7 +217,10 @@ export default function GuideDetail() {
   // Native (liquid-glass) long-press menu for a place: open in Maps, move layer, remove.
   function placeMenuActions(place: Place): MenuAction[] {
     const actions: MenuAction[] = [{ id: 'open', title: 'Open in Apple Maps' }];
-    if (!canEdit) return actions; // viewers can open but not modify
+    // "Visited" is a personal mark, so every role (viewers included) gets it.
+    // `state` renders the native checkmark when the place is already visited.
+    actions.push({ id: 'visited', title: 'Visited', state: visited[place.id] ? 'on' : 'off' });
+    if (!canEdit) return actions; // viewers can open + mark visited, not modify
     const targets = layers.filter((l) => l.id !== place.layerId);
     if (targets.length > 0) {
       actions.push({
@@ -227,6 +241,9 @@ export default function GuideDetail() {
     if (!guide) return;
     if (event === 'open') {
       openPlaceInAppleMaps(place);
+    } else if (event === 'visited') {
+      Haptics.selectionAsync();
+      toggleVisited(place.id);
     } else if (event.startsWith('move:')) {
       Haptics.selectionAsync();
       movePlaceToLayer(guide.id, place.id, event.slice('move:'.length));
@@ -598,6 +615,7 @@ export default function GuideDetail() {
                 onPress={() => focusPlace(item)}
                 onDelete={() => removePlaceFromGuide(guide.id, item.id)}
                 readOnly={!canEdit}
+                visited={!!visited[item.id]}
               />
             </MenuView>
           )}

@@ -162,6 +162,52 @@ function applyGuide(payload: RealtimePostgresChangesPayload<GuideRow>): void {
   }
 }
 
+// Shape of a profiles row as delivered over Realtime (subset we render).
+type ProfileRow = {
+  id: string;
+  display_name: string | null;
+  email: string | null;
+  avatar_url: string | null;
+  avatar_color: string | null;
+};
+
+// A collaborator changed their profile (avatar image/color, display name). Patch
+// the derived member roster + "shared by" label on every guide they appear in,
+// so home-card clusters and rosters update live. Our own profile row arrives too
+// but is a no-op — we're never in our own members list, and our owned guides use
+// role 'owner' (skipped below). Membership *additions* still land on the next
+// foreground refresh (that's a guide_shares change + a profile lookup, not here).
+function applyProfile(payload: RealtimePostgresChangesPayload<ProfileRow>): void {
+  if (payload.eventType === 'DELETE') return; // profiles aren't deleted in-app
+  const row = payload.new as Partial<ProfileRow>;
+  if (!row?.id) return;
+  const uid = row.id;
+  const name = row.display_name?.trim() || row.email || undefined;
+  const avatarUrl = row.avatar_url ?? null;
+  const avatarColor = row.avatar_color ?? null;
+
+  applySuppressed(() => {
+    const touched: Guide[] = [];
+    useGuides.setState((s) => ({
+      guides: s.guides.map((g) => {
+        let changed = false;
+        const members = (g.members ?? []).map((m) => {
+          if (m.userId !== uid) return m;
+          changed = true;
+          return { ...m, name: name ?? m.name, avatarUrl, avatarColor };
+        });
+        // For a guide shared with us, keep the owner's "shared by <name>" current.
+        const ownerName = g.role !== 'owner' && g.ownerId === uid && name ? name : g.ownerName;
+        if (!changed && ownerName === g.ownerName) return g;
+        const ng: Guide = { ...g, members, ownerName };
+        touched.push(ng);
+        return ng;
+      }),
+    }));
+    touched.forEach(noteSynced);
+  });
+}
+
 function applyShare(payload: RealtimePostgresChangesPayload<ShareRow>): void {
   const userId = useAuth.getState().user?.id;
   if (!userId) return;
@@ -201,6 +247,7 @@ export async function startRealtime(): Promise<void> {
     .on('postgres_changes', { event: '*', schema: 'public', table: 'layers' }, applyLayer)
     .on('postgres_changes', { event: '*', schema: 'public', table: 'guides' }, applyGuide)
     .on('postgres_changes', { event: '*', schema: 'public', table: 'guide_shares' }, applyShare)
+    .on('postgres_changes', { event: '*', schema: 'public', table: 'profiles' }, applyProfile)
     .subscribe();
 }
 

@@ -1,5 +1,5 @@
 import { supabase } from '@/lib/supabase';
-import { resolveProfileNames } from '@/lib/api/shares';
+import { resolveProfiles } from '@/lib/api/shares';
 import type { Guide, GuideAccessMember, GuideRole, Layer, Place } from '@/lib/types';
 import { guideRowsToGuide, type GuideRow, type LayerRow, type PlaceRow } from '@/lib/api/mappers';
 
@@ -45,11 +45,11 @@ export async function fetchGuides(userId: string): Promise<Guide[]> {
     ((myShares ?? []) as { guide_id: string; role: GuideRole }[]).map((s) => [s.guide_id, s.role]),
   );
 
-  // Resolve display names once for everyone we'll render: owners + members + self.
+  // Resolve name + avatar once for everyone we'll render: owners + members + self.
   const nameIds = new Set<string>([userId]);
   for (const g of guideRows) nameIds.add(g.owner_id);
   for (const m of memberRows) nameIds.add(m.shared_with);
-  const nameById = await resolveProfileNames([...nameIds]);
+  const cardById = await resolveProfiles([...nameIds]);
 
   // Others with access per guide = owner + accepted members, minus the current
   // user (we never show ourselves in the roster), deduped, owner first.
@@ -60,7 +60,13 @@ export async function fetchGuides(userId: string): Promise<Guide[]> {
     const add = (uid: string) => {
       if (uid === userId || seen.has(uid)) return;
       seen.add(uid);
-      list.push({ userId: uid, name: nameById.get(uid) ?? '' });
+      const card = cardById.get(uid);
+      list.push({
+        userId: uid,
+        name: card?.name ?? '',
+        avatarUrl: card?.avatarUrl,
+        avatarColor: card?.avatarColor,
+      });
     };
     add(g.owner_id);
     for (const m of memberRows) if (m.guide_id === g.id) add(m.shared_with);
@@ -75,7 +81,7 @@ export async function fetchGuides(userId: string): Promise<Guide[]> {
       layerRows.filter((l) => l.guide_id === g.id),
       placeRows.filter((p) => p.guide_id === g.id),
       role,
-      owned ? undefined : nameById.get(g.owner_id),
+      owned ? undefined : cardById.get(g.owner_id)?.name,
       membersByGuide.get(g.id) ?? [],
     );
   });

@@ -24,7 +24,13 @@ export default function AvatarCluster({ members, size = 28, max = 3 }: Props) {
     <View style={styles.row}>
       {shown.map((m, i) => (
         <View key={m.userId} style={[styles.item, ring, i > 0 && { marginLeft: -overlap }]}>
-          <Avatar name={m.name} seed={m.userId} size={size} />
+          <Avatar
+            name={m.name}
+            seed={m.userId}
+            size={size}
+            imageUri={m.avatarUrl}
+            color={m.avatarColor}
+          />
         </View>
       ))}
       {extra > 0 && (

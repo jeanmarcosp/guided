@@ -56,6 +56,11 @@ function GuideInfo({ guide }: { guide: Guide }) {
   const meName = profile?.display_name?.trim() || profile?.email || user?.email || 'You';
   const createdByName = shared ? (guide.ownerName ?? 'Unknown') : meName;
   const createdBySeed = shared ? guide.ownerId : (guide.ownerId ?? user?.id ?? 'me');
+  // Owner's avatar: from my own profile when I own it, else from the member
+  // roster (which includes the owner for shared guides).
+  const ownerCard = shared ? guide.members?.find((m) => m.userId === guide.ownerId) : undefined;
+  const createdByImage = shared ? ownerCard?.avatarUrl : profile?.avatar_url;
+  const createdByColor = shared ? ownerCard?.avatarColor : profile?.avatar_color;
   const createdOn = new Date(guide.createdAt).toLocaleDateString(undefined, {
     year: 'numeric',
     month: 'long',
@@ -68,7 +73,13 @@ function GuideInfo({ guide }: { guide: Guide }) {
       showsVerticalScrollIndicator={false}
     >
       <Section label="CREATED BY">
-        <PersonCard name={createdByName} seed={createdBySeed} you={!shared} />
+        <PersonCard
+          name={createdByName}
+          seed={createdBySeed}
+          you={!shared}
+          imageUri={createdByImage}
+          color={createdByColor}
+        />
       </Section>
 
       {(guide.role === 'owner' || shared) && <MembersSection guideId={guide.id} />}
@@ -123,7 +134,13 @@ function MembersSection({ guideId }: { guideId: string }) {
               key={m.userId}
               style={[styles.card, { backgroundColor: colors.surface, borderColor: colors.border }]}
             >
-              <Avatar name={m.name} seed={m.userId} size={36} />
+              <Avatar
+                name={m.name}
+                seed={m.userId}
+                size={36}
+                imageUri={m.avatarUrl}
+                color={m.avatarColor}
+              />
               <Text
                 numberOfLines={1}
                 style={[typography.body, styles.cardText, { color: colors.textPrimary }]}
@@ -142,11 +159,23 @@ function MembersSection({ guideId }: { guideId: string }) {
   );
 }
 
-function PersonCard({ name, seed, you }: { name: string; seed?: string | null; you?: boolean }) {
+function PersonCard({
+  name,
+  seed,
+  you,
+  imageUri,
+  color,
+}: {
+  name: string;
+  seed?: string | null;
+  you?: boolean;
+  imageUri?: string | null;
+  color?: string | null;
+}) {
   const colors = useColors();
   return (
     <View style={[styles.card, { backgroundColor: colors.surface, borderColor: colors.border }]}>
-      <Avatar name={name} seed={seed} size={36} />
+      <Avatar name={name} seed={seed} size={36} imageUri={imageUri} color={color} />
       <Text
         numberOfLines={1}
         style={[typography.body, styles.cardText, { color: colors.textPrimary }]}

@@ -31,31 +31,42 @@ export type GuideMember = {
   userId: string;
   name: string;
   role: GuideRole;
+  avatarUrl?: string | null;
+  avatarColor?: string | null;
+};
+
+/** A resolved profile for rendering an avatar + name. */
+export type ProfileCard = {
+  name: string;
+  avatarUrl: string | null;
+  avatarColor: string | null;
 };
 
 /**
- * Resolve a set of user ids to display names (falling back to email).
- * Returns a Map keyed by user id; ids without a readable profile are omitted.
- * RLS: the owner can read their members' profiles (0007) and members can read
- * the owner's (0006), so callers only get names they're entitled to see.
+ * Resolve a set of user ids to name + avatar, keyed by user id; ids without a
+ * readable profile are omitted. RLS: the owner can read their members' profiles
+ * (0007) and members can read the owner's (0006), so callers only get people
+ * they're entitled to see.
  */
-export async function resolveProfileNames(userIds: string[]): Promise<Map<string, string>> {
+export async function resolveProfiles(userIds: string[]): Promise<Map<string, ProfileCard>> {
   const ids = [...new Set(userIds)].filter(Boolean);
   if (ids.length === 0) return new Map();
   const { data: profiles } = await supabase
     .from('profiles')
-    .select('id, display_name, email')
+    .select('id, display_name, email, avatar_url, avatar_color')
     .in('id', ids);
-  const nameById = new Map<string, string>();
+  const byId = new Map<string, ProfileCard>();
   for (const p of (profiles ?? []) as {
     id: string;
     display_name: string | null;
     email: string | null;
+    avatar_url: string | null;
+    avatar_color: string | null;
   }[]) {
     const name = p.display_name?.trim() || p.email;
-    if (name) nameById.set(p.id, name);
+    if (name) byId.set(p.id, { name, avatarUrl: p.avatar_url, avatarColor: p.avatar_color });
   }
-  return nameById;
+  return byId;
 }
 
 /**
@@ -75,12 +86,17 @@ export async function fetchGuideMembers(guideId: string): Promise<GuideMember[]>
   const rows = (data ?? []) as { shared_with: string; role: GuideRole }[];
   if (rows.length === 0) return [];
 
-  const nameById = await resolveProfileNames(rows.map((r) => r.shared_with));
-  return rows.map((r) => ({
-    userId: r.shared_with,
-    name: nameById.get(r.shared_with) ?? 'Member',
-    role: r.role,
-  }));
+  const cardById = await resolveProfiles(rows.map((r) => r.shared_with));
+  return rows.map((r) => {
+    const card = cardById.get(r.shared_with);
+    return {
+      userId: r.shared_with,
+      name: card?.name ?? 'Member',
+      role: r.role,
+      avatarUrl: card?.avatarUrl,
+      avatarColor: card?.avatarColor,
+    };
+  });
 }
 
 /** List a guide's share links + accepted members (owner only, per RLS). */

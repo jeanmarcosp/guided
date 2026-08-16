@@ -10,6 +10,7 @@ import { bootstrapSignedIn, teardownSignedOut } from '@/lib/sync/bootstrap';
 import { refreshSharedGuides, startGuidesSync } from '@/lib/sync/guidesSync';
 import { useAuth } from '@/store/auth';
 import { useSettings } from '@/store/settings';
+import { useVisits } from '@/store/visits';
 import { useColors, useEffectiveScheme } from '@/theme/tokens';
 
 // Nested reorderable lists (guides home) intentionally place non-scrolling
@@ -69,6 +70,8 @@ export default function RootLayout() {
     const sub = AppState.addEventListener('change', (next) => {
       if (next === 'active' && useAuth.getState().status === 'signedIn') {
         void refreshSharedGuides();
+        // Visits aren't on Realtime; re-pull to catch marks made on another device.
+        void useVisits.getState().hydrate();
       }
     });
     return () => sub.remove();
