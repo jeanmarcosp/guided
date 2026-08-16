@@ -1,7 +1,7 @@
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
-import { useFocusEffect, useRouter } from 'expo-router';
-import { useCallback, useMemo, useState, type ReactNode } from 'react';
+import { useRouter } from 'expo-router';
+import { useMemo, useState, type ReactNode } from 'react';
 import { Alert, FlatList, Pressable, StyleSheet, Text, View } from 'react-native';
 import {
   NestedReorderableList,
@@ -13,7 +13,6 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import GuideCard from '@/components/GuideCard';
 import GuideEditor, { type GuideDraft } from '@/components/GuideEditor';
 import SwipeActionRow, { type SwipeAction } from '@/components/SwipeActionRow';
-import { refreshSharedGuides } from '@/lib/sync/guidesSync';
 import type { Guide } from '@/lib/types';
 import { useGuides } from '@/store/guides';
 import { GUIDE_COLORS, GUIDE_EMOJIS, radius, spacing, typography, useColors } from '@/theme/tokens';
@@ -48,14 +47,10 @@ export default function GuidesHome() {
   const pinnedList = useMemo(() => ownedGuides.filter((g) => g.pinned), [ownedGuides]);
   const restList = useMemo(() => ownedGuides.filter((g) => !g.pinned), [ownedGuides]);
 
-  // No realtime yet (phase 2): refresh shared guides whenever home is focused,
-  // so a viewer picks up the owner's edits on return without a restart.
-  const hasShared = sharedGuides.length > 0;
-  useFocusEffect(
-    useCallback(() => {
-      if (hasShared) void refreshSharedGuides();
-    }, [hasShared]),
-  );
+  const canReorder = pinnedList.length > 1 || restList.length > 1 || sharedGuides.length > 1;
+
+  // Live updates for shared guides now arrive via Realtime (lib/sync/realtime.ts);
+  // no focus-based polling needed here.
 
   // Flat rows (with interleaved section headers) for the normal, swipeable list.
   const rows = useMemo<Row[]>(() => {
@@ -164,16 +159,38 @@ export default function GuidesHome() {
     return arr;
   }
 
+  // Each handler rebuilds the full order (owned sections + shared) so the store
+  // array — which also persists the viewer's local shared-guide order — stays
+  // explicit. Reordering shared guides is local only; the sync engine's reorder
+  // path is scoped to owned guides, so it never tries to write the owner's data.
   function reorderPinned({ from, to }: ReorderableListReorderEvent) {
     Haptics.selectionAsync();
     const pinned = reorderGroup(pinnedList, from, to);
-    setGuidesOrder([...pinned.map((g) => g.id), ...restList.map((g) => g.id)]);
+    setGuidesOrder([
+      ...pinned.map((g) => g.id),
+      ...restList.map((g) => g.id),
+      ...sharedGuides.map((g) => g.id),
+    ]);
   }
 
   function reorderRest({ from, to }: ReorderableListReorderEvent) {
     Haptics.selectionAsync();
     const rest = reorderGroup(restList, from, to);
-    setGuidesOrder([...pinnedList.map((g) => g.id), ...rest.map((g) => g.id)]);
+    setGuidesOrder([
+      ...pinnedList.map((g) => g.id),
+      ...rest.map((g) => g.id),
+      ...sharedGuides.map((g) => g.id),
+    ]);
+  }
+
+  function reorderShared({ from, to }: ReorderableListReorderEvent) {
+    Haptics.selectionAsync();
+    const shared = reorderGroup(sharedGuides, from, to);
+    setGuidesOrder([
+      ...pinnedList.map((g) => g.id),
+      ...restList.map((g) => g.id),
+      ...shared.map((g) => g.id),
+    ]);
   }
 
   // Normal (swipeable) list item.
@@ -241,6 +258,20 @@ export default function GuidesHome() {
       />,
     );
   }
+  if (sharedGuides.length > 0) {
+    reorderSticky.push(reorderChildren.length);
+    reorderChildren.push(<SectionHeader key="h-shared" label="SHARED WITH ME" />);
+    reorderChildren.push(
+      <NestedReorderableList
+        key="list-shared"
+        data={sharedGuides}
+        scrollable={false}
+        keyExtractor={(g) => g.id}
+        onReorder={reorderShared}
+        renderItem={renderDragRow}
+      />,
+    );
+  }
 
   const contentStyle = { paddingHorizontal: spacing.lg, paddingBottom: insets.bottom + spacing.xl };
 
@@ -273,7 +304,7 @@ export default function GuidesHome() {
               >
                 <Ionicons name="person-circle-outline" size={22} color={colors.textPrimary} />
               </Pressable>
-              {ownedGuides.length > 1 && (
+              {canReorder && (
                 <Pressable
                   onPress={() => setReordering(true)}
                   style={({ pressed }) => [

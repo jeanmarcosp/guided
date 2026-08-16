@@ -30,6 +30,12 @@ export default function SearchScreen() {
   const guide = useGuides((s) => s.guides.find((g) => g.id === id));
   const addPlaceToGuide = useGuides((s) => s.addPlaceToGuide);
 
+  // Adding places is for owners/editors only. The entry button is hidden for
+  // viewers; this guards a stray deep link into the modal.
+  useEffect(() => {
+    if (guide?.role === 'viewer') router.back();
+  }, [guide?.role, router]);
+
   // Primary bias = the map's center passed in from the guide screen (the area
   // the user is looking at). Falls back to device location if none was passed.
   const [query, setQuery] = useState('');

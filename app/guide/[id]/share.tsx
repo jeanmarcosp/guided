@@ -10,6 +10,7 @@ import {
   listShares,
   resolveProfileNames,
   revokeShare,
+  updateShareRole,
   type ShareRow,
 } from '@/lib/api/shares';
 import { useGuides } from '@/store/guides';
@@ -25,15 +26,25 @@ export default function ShareGuideScreen() {
 
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
-  const [linkUrl, setLinkUrl] = useState<string | null>(null);
+  const [role, setRole] = useState<'viewer' | 'editor'>('viewer');
+  const [linkByRole, setLinkByRole] = useState<{ viewer: string | null; editor: string | null }>({
+    viewer: null,
+    editor: null,
+  });
   const [members, setMembers] = useState<Member[]>([]);
 
   const load = useCallback(async () => {
     if (!id) return;
     try {
       const rows = await listShares(id);
-      const template = rows.find((r) => r.shared_with === null);
-      setLinkUrl(template ? Linking.createURL(`share/${template.token}`) : null);
+      // Reusable link rows (shared_with === null) — one per role.
+      const links = { viewer: null as string | null, editor: null as string | null };
+      for (const r of rows) {
+        if (r.shared_with === null && (r.role === 'viewer' || r.role === 'editor')) {
+          links[r.role] = Linking.createURL(`share/${r.token}`);
+        }
+      }
+      setLinkByRole(links);
       const memberRows = rows.filter(
         (r): r is ShareRow & { shared_with: string } => r.shared_with !== null,
       );
@@ -54,15 +65,17 @@ export default function ShareGuideScreen() {
     if (!id) return;
     try {
       setBusy(true);
-      let url = linkUrl;
+      let url = linkByRole[role];
       if (!url) {
-        const created = await createShareLink(id, 'viewer');
+        const created = await createShareLink(id, role);
         url = created.url;
-        setLinkUrl(url);
+        setLinkByRole((prev) => ({ ...prev, [role]: url }));
       }
-      await Share.share({
-        message: `Check out my “${guide?.name ?? 'guide'}” on Guided: ${url}`,
-      });
+      const message =
+        role === 'editor'
+          ? `Help build my “${guide?.name ?? 'guide'}” on Guided: ${url}`
+          : `Check out my “${guide?.name ?? 'guide'}” on Guided: ${url}`;
+      await Share.share({ message });
     } catch (e: any) {
       Alert.alert('Could not share', e?.message ?? 'Please try again.');
     } finally {
@@ -88,6 +101,27 @@ export default function ShareGuideScreen() {
     ]);
   };
 
+  const changeRole = async (member: Member, next: 'viewer' | 'editor') => {
+    if (member.role === next) return;
+    // Optimistic — the member picks the new role up live via Realtime.
+    setMembers((m) => m.map((r) => (r.id === member.id ? { ...r, role: next } : r)));
+    try {
+      await updateShareRole(member.id, next);
+    } catch (e: any) {
+      setMembers((m) => m.map((r) => (r.id === member.id ? { ...r, role: member.role } : r)));
+      Alert.alert('Could not update', e?.message ?? 'Please try again.');
+    }
+  };
+
+  const manageMember = (member: Member) => {
+    Alert.alert(member.name, 'Set what this person can do with the guide.', [
+      { text: 'Can view', onPress: () => changeRole(member, 'viewer') },
+      { text: 'Can edit', onPress: () => changeRole(member, 'editor') },
+      { text: 'Remove access', style: 'destructive', onPress: () => confirmRevoke(member) },
+      { text: 'Cancel', style: 'cancel' },
+    ]);
+  };
+
   return (
     <SafeAreaView
       style={[styles.container, { backgroundColor: colors.background }]}
@@ -101,9 +135,32 @@ export default function ShareGuideScreen() {
       </View>
 
       <Text style={[typography.body, { color: colors.textSecondary, marginBottom: spacing.lg }]}>
-        Anyone with the link can view “{guide?.name ?? 'this guide'}”. They’ll need to sign in to
-        open it.
+        {role === 'editor'
+          ? `Anyone with this link can add and edit places in “${guide?.name ?? 'this guide'}”. They’ll need to sign in to open it.`
+          : `Anyone with this link can view “${guide?.name ?? 'this guide'}”. They’ll need to sign in to open it.`}
       </Text>
+
+      <View style={[styles.segment, { backgroundColor: colors.surfaceAlt }]}>
+        {(['viewer', 'editor'] as const).map((r) => {
+          const active = role === r;
+          return (
+            <Pressable
+              key={r}
+              onPress={() => setRole(r)}
+              style={[styles.segmentBtn, active && { backgroundColor: colors.surface }]}
+            >
+              <Text
+                style={[
+                  typography.bodyMedium,
+                  { color: active ? colors.textPrimary : colors.textSecondary },
+                ]}
+              >
+                {r === 'editor' ? 'Can edit' : 'Can view'}
+              </Text>
+            </Pressable>
+          );
+        })}
+      </View>
 
       <Pressable
         onPress={shareLink}
@@ -119,7 +176,7 @@ export default function ShareGuideScreen() {
           <>
             <Ionicons name="link" size={18} color="#fff" />
             <Text style={[typography.bodyMedium, { color: '#fff' }]}>
-              {linkUrl ? 'Share link' : 'Create & share link'}
+              {linkByRole[role] ? 'Share link' : 'Create & share link'}
             </Text>
           </>
         )}
@@ -143,12 +200,16 @@ export default function ShareGuideScreen() {
               <Text numberOfLines={1} style={[typography.body, { color: colors.textPrimary }]}>
                 {m.name}
               </Text>
-              <Text style={[typography.caption, { color: colors.textTertiary }]}>
+            </View>
+            <Pressable
+              onPress={() => manageMember(m)}
+              hitSlop={8}
+              style={({ pressed }) => [styles.roleControl, pressed && { opacity: 0.6 }]}
+            >
+              <Text style={[typography.caption, { color: colors.textSecondary }]}>
                 {m.role === 'editor' ? 'Editor' : 'Viewer'}
               </Text>
-            </View>
-            <Pressable onPress={() => confirmRevoke(m)} hitSlop={8}>
-              <Text style={[typography.body, { color: colors.danger }]}>Remove</Text>
+              <Ionicons name="chevron-down" size={14} color={colors.textTertiary} />
             </Pressable>
           </View>
         ))
@@ -164,6 +225,19 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'space-between',
     marginBottom: spacing.md,
+  },
+  segment: {
+    flexDirection: 'row',
+    borderRadius: radius.sm,
+    padding: 3,
+    marginBottom: spacing.lg,
+  },
+  segmentBtn: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: spacing.sm,
+    borderRadius: radius.sm - 2,
   },
   primaryBtn: {
     flexDirection: 'row',
@@ -182,4 +256,5 @@ const styles = StyleSheet.create({
     borderBottomWidth: StyleSheet.hairlineWidth,
   },
   memberInfo: { flex: 1 },
+  roleControl: { flexDirection: 'row', alignItems: 'center', gap: 3 },
 });

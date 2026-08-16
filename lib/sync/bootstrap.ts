@@ -1,5 +1,6 @@
 import { uploadLocalGuidesOnce } from '@/lib/migration/uploadLocalGuides';
 import { clearLocalGuides, hydrateGuidesFromServer } from '@/lib/sync/guidesSync';
+import { startRealtime, stopRealtime } from '@/lib/sync/realtime';
 import { useAuth } from '@/store/auth';
 import { useGuides } from '@/store/guides';
 
@@ -23,9 +24,12 @@ export async function bootstrapSignedIn(): Promise<void> {
   await waitForLocalHydration();
   await uploadLocalGuidesOnce(userId);
   await hydrateGuidesFromServer();
+  // Go live: subscribe to collaborators' (and our other devices') edits.
+  await startRealtime();
 }
 
-/** On sign-out: drop local guide state so the next account starts clean. */
+/** On sign-out: drop the live subscription and local guide state. */
 export function teardownSignedOut(): void {
+  stopRealtime();
   clearLocalGuides();
 }
