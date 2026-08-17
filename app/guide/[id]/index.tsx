@@ -26,7 +26,7 @@ const DEFAULT_REGION: Region = {
 };
 
 const RECENTER_SIZE = 44;
-const CONTROLS_HEIGHT = RECENTER_SIZE * 2 + 8; // locate + fit-all, stacked
+const CONTROLS_HEIGHT = RECENTER_SIZE * 4 + 8 * 3; // zoom in/out + locate + fit-all, stacked
 
 // The sheet opens at snapPoints[1] ('45%'). gorhom lays the scroll content out
 // against the tallest snap (90%), so to center the empty message within the
@@ -192,6 +192,24 @@ export default function GuideDetail() {
       );
     } catch {
       // Ignore — location is optional.
+    }
+  }
+
+  // Step the camera zoom. halve the altitude to zoom in, double it to zoom out
+  // (Apple Maps camera; the zoom fallback covers a Google provider).
+  async function zoomBy(factor: number) {
+    Haptics.selectionAsync();
+    try {
+      const cam = await mapRef.current?.getCamera();
+      if (!cam) return;
+      programmaticMove.current = true;
+      if (cam.altitude) {
+        mapRef.current?.animateCamera({ altitude: cam.altitude * factor }, { duration: 250 });
+      } else if (cam.zoom != null) {
+        mapRef.current?.animateCamera({ zoom: cam.zoom - Math.log2(factor) }, { duration: 250 });
+      }
+    } catch {
+      // Ignore — map may not be ready yet.
     }
   }
 
@@ -365,6 +383,9 @@ export default function GuideDetail() {
         layerColors={layerColors}
         initialRegion={DEFAULT_REGION}
         onMarkerPress={focusPlace}
+        onAutoCameraMove={() => {
+          programmaticMove.current = true;
+        }}
         onRegionChangeComplete={handleRegionChange}
         onMapReady={() => {
           mapReady.current = true;
@@ -421,6 +442,20 @@ export default function GuideDetail() {
 
       {/* Floating map controls — ride just above the sheet */}
       <Animated.View style={[styles.controlsWrap, { right: spacing.lg }, controlsStyle]}>
+        <Pressable
+          onPress={() => zoomBy(0.5)}
+          style={[styles.recenterBtn, { backgroundColor: colors.surface }]}
+          hitSlop={8}
+        >
+          <Ionicons name="add" size={24} color={colors.textPrimary} />
+        </Pressable>
+        <Pressable
+          onPress={() => zoomBy(2)}
+          style={[styles.recenterBtn, { backgroundColor: colors.surface }]}
+          hitSlop={8}
+        >
+          <Ionicons name="remove" size={24} color={colors.textPrimary} />
+        </Pressable>
         <Pressable
           onPress={locateMe}
           style={[styles.recenterBtn, { backgroundColor: colors.surface }]}
