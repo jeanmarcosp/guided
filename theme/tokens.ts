@@ -54,6 +54,7 @@ export const GUIDE_EMOJIS = [
   '🏖️',
   '🍷',
   '🏛️',
+  '🗽',
   '🎨',
   '🌃',
   '⛰️',
