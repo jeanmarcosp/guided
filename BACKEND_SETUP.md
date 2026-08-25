@@ -171,7 +171,7 @@ member list, and the share screen — so collaborators see each other's.
    can load an avatar by URL. `0014` publishes `profiles` for Realtime so a
    collaborator's avatar/name change reaches other members' clusters **live**
    (RLS still gates delivery to people who share a guide). Re-run `supabase db
-   push` after pulling — applied migrations are skipped by filename.
+push` after pulling — applied migrations are skipped by filename.
 2. Nothing else to configure — the bucket and its policies are created by the
    migration (no dashboard clicks). The app already requests photo-library
    permission via the `expo-image-picker` config plugin (`app.json`).
@@ -189,5 +189,36 @@ Verify (single account, on a **dev build** — the image picker is a native modu
 - Share the guide with a second account → each sees the other's avatar in the
   member cluster / people list. Changing one account's avatar updates the other's
   cluster **live** (via `0014`'s profiles Realtime). Note the home cluster shows
-  *other* members, never yourself — so a single account won't see its own change
+  _other_ members, never yourself — so a single account won't see its own change
   there. New members joining still appear on the next app foreground.
+
+## Account deletion
+
+Required by Apple (App Store Review Guideline 5.1.1(v)): any app that supports
+creating an account must also let people delete it, in-app. Deleting the
+`auth.users` row cascades through every foreign key that points at
+`profiles(id)` — owned guides (and their layers/places), `guide_shares` rows
+(as owner and as a member), and `place_visits` — so no new migration is needed;
+the avatar file in Storage isn't covered by a foreign key and is removed
+explicitly by the function.
+
+Deleting an auth user needs the **service-role key**, which never ships to the
+client, so it runs as an edge function:
+
+```bash
+supabase functions deploy delete-account
+```
+
+Nothing else to configure — `SUPABASE_URL`, `SUPABASE_ANON_KEY`, and
+`SUPABASE_SERVICE_ROLE_KEY` are provided to every edge function automatically.
+
+Verify (use a throwaway account — this is irreversible):
+
+- **Settings → Delete Account** → confirm. You're returned to sign-in, and the
+  account (plus any guides it owned) is gone — check the `auth.users` and
+  `guides` tables in Supabase Studio.
+- Share one of that account's guides with a second account first, then delete
+  the first account → the guide disappears for the second account too (guides
+  cascade-delete with their owner). A guide _shared with_ the deleted account
+  (owned by someone else) is unaffected — it just drops off the deleted
+  account's list.

@@ -81,21 +81,21 @@ analytics SDKs. Your information is shared only:
   everyone it was shared with.
 - You can revoke someone's access to a guide you own at any time from
   that guide's Share screen.
-
-> **Note (to fix before this goes live):** the app doesn't yet have an
-> in-app "delete my account" option — only sign-out. Apple requires
-> account deletion to be available in-app, not just by request, for any
-> app that supports creating an account (App Store Review Guideline
-> 5.1.1(v)). This needs to be built before submission; once it exists,
-> update this section to describe it and drop this note.
+- You can permanently delete your account from Settings → Delete
+  Account. This deletes your account, every guide you own (including
+  for anyone you've shared it with), your visited marks, and your
+  avatar photo. It cannot be undone. Guides others have shared with
+  you are simply removed from your view — deleting your account
+  doesn't affect their guide or their other collaborators.
 
 ## Data retention
 
 We keep your account and guides until you delete them, or until you
-delete your account (see the note above). If you delete a guide, its
-places and layers are deleted with it. If you revoke someone's access
-to a shared guide, they lose access to that guide's content going
-forward.
+delete your account. If you delete a guide, its places and layers are
+deleted with it. If you revoke someone's access to a shared guide,
+they lose access to that guide's content going forward. Deleting your
+account removes your data as described above immediately; it isn't
+held in a recoverable state afterward.
 
 ## Children's privacy
 
