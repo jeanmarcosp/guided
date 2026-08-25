@@ -40,5 +40,6 @@ yarn-error.*
 /ios
 /android
 
-# Supabase CLI's local update-check cache — not project config
-supabase/.temp/cli-latest
+# Supabase CLI's local cache — link metadata, DB pooler host, org id, version
+# pins. Local-machine state, not project config; no reason to publish it.
+supabase/.temp/
