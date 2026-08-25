@@ -21,6 +21,22 @@ import { useGuides } from '@/store/guides';
 // row by its (globally unique) id wherever it lives in the store.
 
 let channel: RealtimeChannel | null = null;
+// Serializes startRealtime()/stopRealtime() against each other and against
+// concurrent calls to themselves. Two hazards this closes:
+//  1. Two overlapping startRealtime() calls (e.g. the auth store's initial
+//     getSession() and its onAuthStateChange listener can each independently
+//     flip status to 'signedIn', both triggering bootstrapSignedIn()) would
+//     otherwise both pass the old `if (channel) return` guard — it was only
+//     assigned after an await — and each build its own `.on()` listeners.
+//  2. supabase.removeChannel() is itself async (it awaits a network
+//     unsubscribe before detaching the channel from the client), so a
+//     startRealtime() landing while a stopRealtime() is still tearing down
+//     would have `supabase.channel('guides-sync')` hand back that same,
+//     still-joined channel (the client reuses channels by topic name).
+// Either way the symptom is the same: `.on()` throws "cannot add
+// `postgres_changes` callbacks ... after `subscribe()`" because the channel
+// object is already joined/joining when the second caller attaches to it.
+let pending: Promise<void> | null = null;
 
 /** Mutate one guide by id under suppression, and refresh its sync baseline. */
 function patchGuide(guideId: string, fn: (g: Guide) => Guide): void {
@@ -234,26 +250,57 @@ function applyShare(payload: RealtimePostgresChangesPayload<ShareRow>): void {
   patchGuide(row.guide_id, (g) => ({ ...g, role: row.role }));
 }
 
-/** Subscribe to live guide/layer/place/share changes. Idempotent. */
+/** Subscribe to live guide/layer/place/share changes. Idempotent, and safe to
+ * call concurrently with itself or with stopRealtime() — see the note on
+ * `pending` above.
+ *
+ * The `if (pending) await ...` below must stay inline, not factored into an
+ * `async function` helper that's awaited unconditionally: calling *any* async
+ * function and awaiting its result defers by a microtask even when it has
+ * nothing to wait for, which reopens the exact race this is closing — two
+ * calls landing close together could both see `pending` as null, both yield
+ * on that unconditional await, and both resume and race to claim `pending`
+ * themselves. Awaiting only inside the `if` keeps the no-op path fully
+ * synchronous, so whichever call runs first claims `pending` atomically
+ * before the other one's check can run. */
 export async function startRealtime(): Promise<void> {
+  if (pending) await pending.catch(() => {});
   if (channel) return;
-  // Authenticate the socket so postgres_changes are filtered by RLS for this user.
-  const { data } = await supabase.auth.getSession();
-  supabase.realtime.setAuth(data.session?.access_token ?? null);
+  pending = (async () => {
+    // Authenticate the socket so postgres_changes are filtered by RLS for this user.
+    const { data } = await supabase.auth.getSession();
+    supabase.realtime.setAuth(data.session?.access_token ?? null);
+    // Re-check after the await: a concurrent call may have already started it
+    // (or we may have signed out again) while we were waiting on the session.
+    if (channel || useAuth.getState().status !== 'signedIn') return;
 
-  channel = supabase
-    .channel('guides-sync')
-    .on('postgres_changes', { event: '*', schema: 'public', table: 'places' }, applyPlace)
-    .on('postgres_changes', { event: '*', schema: 'public', table: 'layers' }, applyLayer)
-    .on('postgres_changes', { event: '*', schema: 'public', table: 'guides' }, applyGuide)
-    .on('postgres_changes', { event: '*', schema: 'public', table: 'guide_shares' }, applyShare)
-    .on('postgres_changes', { event: '*', schema: 'public', table: 'profiles' }, applyProfile)
-    .subscribe();
+    channel = supabase
+      .channel('guides-sync')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'places' }, applyPlace)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'layers' }, applyLayer)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'guides' }, applyGuide)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'guide_shares' }, applyShare)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'profiles' }, applyProfile)
+      .subscribe();
+  })();
+  try {
+    await pending;
+  } finally {
+    pending = null;
+  }
 }
 
-/** Tear down the live subscription (call on sign-out). */
-export function stopRealtime(): void {
+/** Tear down the live subscription (call on sign-out). Safe to call
+ * concurrently with itself or with startRealtime(). */
+export async function stopRealtime(): Promise<void> {
+  if (pending) await pending.catch(() => {});
   if (!channel) return;
-  supabase.removeChannel(channel);
+  const toRemove = channel;
   channel = null;
+  pending = supabase.removeChannel(toRemove).then(() => {});
+  try {
+    await pending;
+  } finally {
+    pending = null;
+  }
 }

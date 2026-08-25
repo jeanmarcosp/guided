@@ -11,6 +11,7 @@ import {
 } from 'react-native-reorderable-list';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import GuideCard from '@/components/GuideCard';
+import GuideCardSkeleton from '@/components/GuideCardSkeleton';
 import GuideEditor, { type GuideDraft } from '@/components/GuideEditor';
 import SwipeActionRow, { type SwipeAction } from '@/components/SwipeActionRow';
 import type { Guide } from '@/lib/types';
@@ -30,6 +31,8 @@ export default function GuidesHome() {
   const router = useRouter();
 
   const guides = useGuides((s) => s.guides);
+  const hydrated = useGuides((s) => s.hydrated);
+  const initialSyncDone = useGuides((s) => s.initialSyncDone);
   const createGuide = useGuides((s) => s.createGuide);
   const updateGuide = useGuides((s) => s.updateGuide);
   const deleteGuide = useGuides((s) => s.deleteGuide);
@@ -48,6 +51,8 @@ export default function GuidesHome() {
   const restList = useMemo(() => ownedGuides.filter((g) => !g.pinned), [ownedGuides]);
 
   const canReorder = pinnedList.length > 1 || restList.length > 1 || sharedGuides.length > 1;
+
+  const loadingGuides = guides.length === 0 && (!hydrated || !initialSyncDone);
 
   // Live updates for shared guides now arrive via Realtime (lib/sync/realtime.ts);
   // no focus-based polling needed here.
@@ -333,7 +338,15 @@ export default function GuidesHome() {
         </View>
       </View>
 
-      {guides.length === 0 ? (
+      {loadingGuides ? (
+        <View style={contentStyle}>
+          {Array.from({ length: 4 }).map((_, i) => (
+            <View key={i} style={styles.guideSpacer}>
+              <GuideCardSkeleton />
+            </View>
+          ))}
+        </View>
+      ) : guides.length === 0 ? (
         <View style={styles.empty}>
           <View
             style={[

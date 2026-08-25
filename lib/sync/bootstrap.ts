@@ -33,7 +33,7 @@ export async function bootstrapSignedIn(): Promise<void> {
 
 /** On sign-out: drop the live subscription and local guide + visit state. */
 export function teardownSignedOut(): void {
-  stopRealtime();
+  void stopRealtime();
   clearLocalGuides();
   useVisits.getState().clear();
 }
