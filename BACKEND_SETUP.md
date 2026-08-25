@@ -36,8 +36,21 @@ Security policies, and the `accept_share_token` RPC.
 Sign-in uses a **6-digit email code** (`signInWithOtp` + `verifyOtp`), which
 needs custom SMTP (the built-in email service is rate-limited to a couple/hour
 and can't edit templates). Configure **Custom SMTP** under
-**Authentication → Emails → SMTP Settings** (Gmail SMTP with an App Password
-works for personal testing), then:
+**Authentication → Emails → SMTP Settings**.
+
+**Production** sends through [Resend](https://resend.com) on a domain we
+control (`guidedmaps.com`), verified there (SPF/DKIM/DMARC DNS records added
+at the registrar):
+
+- Host `smtp.resend.com`, port `465` (SSL) or `587` (TLS), username `resend`,
+  password = a Resend API key.
+- Sender email on the verified domain (e.g. `noreply@guidedmaps.com`).
+
+For **personal/dev testing only**, Gmail SMTP with an App Password also
+works — just don't rely on it for anything beyond your own testing (rate
+limits, deliverability, and it's outside Gmail's intended use).
+
+Then, either way:
 
 - **Authentication → Emails → Magic Link template:** render the code with
   `{{ .Token }}` (this is the template `signInWithOtp` uses).
