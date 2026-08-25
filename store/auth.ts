@@ -44,18 +44,12 @@ export const useAuth = create<AuthState>()((set, get) => ({
   profile: null,
 
   init: () => {
-    // Hydrate from any persisted session, then subscribe to future changes.
-    supabase.auth.getSession().then(async ({ data }) => {
-      const session = data.session ?? null;
-      const profile = session ? await fetchProfile(session.user.id) : null;
-      set({
-        session,
-        user: session?.user ?? null,
-        profile,
-        status: session ? 'signedIn' : 'signedOut',
-      });
-    });
-
+    // onAuthStateChange alone covers both cases: it fires once immediately with
+    // the resolved persisted session (event 'INITIAL_SESSION') and again on every
+    // later change. A separate getSession() call here would race it — both
+    // resolve the same session independently and each call set(), which could
+    // flip `status` more than once per real transition (e.g. bootstrapSignedIn,
+    // and so startRealtime(), firing twice — see lib/sync/realtime.ts).
     const { data: sub } = supabase.auth.onAuthStateChange(async (_event, session) => {
       const profile = session ? await fetchProfile(session.user.id) : null;
       set({
