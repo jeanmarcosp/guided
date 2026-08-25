@@ -11,6 +11,7 @@ type LayerPatch = Partial<Pick<Layer, 'name' | 'color' | 'emoji'>>;
 type GuidesState = {
   guides: Guide[];
   hydrated: boolean;
+  initialSyncDone: boolean;
   createGuide: (name: string, emoji?: string, color?: string) => Guide;
   renameGuide: (id: string, name: string) => void;
   updateGuideStyle: (id: string, emoji: string, color: string) => void;
@@ -52,6 +53,7 @@ export const useGuides = create<GuidesState>()(
     (set, get) => ({
       guides: [],
       hydrated: false,
+      initialSyncDone: false,
 
       createGuide: (name, emoji, color) => {
         const seed = get().guides.length;

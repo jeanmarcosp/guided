@@ -181,30 +181,36 @@ export function withLocalLayerView(server: Guide, local: Guide | undefined): Gui
 export async function hydrateGuidesFromServer(): Promise<void> {
   const userId = useAuth.getState().user?.id;
   if (!userId) return;
-  const guides = await fetchGuides(userId);
-  suppress = true;
   try {
-    const prev = useGuides.getState().guides;
-    const prevById = new Map(prev.map((g) => [g.id, g]));
-    const localRank = new Map(prev.map((g, i) => [g.id, i]));
-    // Preserve the user's local ordering. Owned-guide order also lives on the
-    // server (sort_order), but shared guides' server sort_order belongs to the
-    // owner, so the viewer's local reorder is the only source of truth for them.
-    // Guides new to this device fall after known ones, keeping their server order.
-    const base = prev.length;
-    const next = guides
-      .map((g, serverIdx) => ({ guide: withLocalLayerView(g, prevById.get(g.id)), serverIdx }))
-      .sort((a, b) => {
-        const ra = localRank.get(a.guide.id) ?? base + a.serverIdx;
-        const rb = localRank.get(b.guide.id) ?? base + b.serverIdx;
-        return ra - rb;
-      })
-      .map((x) => x.guide);
-    useGuides.setState({ guides: next });
-    lastSynced.clear();
-    for (const g of next) noteSynced(g);
+    const guides = await fetchGuides(userId);
+    suppress = true;
+    try {
+      const prev = useGuides.getState().guides;
+      const prevById = new Map(prev.map((g) => [g.id, g]));
+      const localRank = new Map(prev.map((g, i) => [g.id, i]));
+      // Preserve the user's local ordering. Owned-guide order also lives on the
+      // server (sort_order), but shared guides' server sort_order belongs to the
+      // owner, so the viewer's local reorder is the only source of truth for them.
+      // Guides new to this device fall after known ones, keeping their server order.
+      const base = prev.length;
+      const next = guides
+        .map((g, serverIdx) => ({ guide: withLocalLayerView(g, prevById.get(g.id)), serverIdx }))
+        .sort((a, b) => {
+          const ra = localRank.get(a.guide.id) ?? base + a.serverIdx;
+          const rb = localRank.get(b.guide.id) ?? base + b.serverIdx;
+          return ra - rb;
+        })
+        .map((x) => x.guide);
+      useGuides.setState({ guides: next });
+      lastSynced.clear();
+      for (const g of next) noteSynced(g);
+    } finally {
+      suppress = false;
+    }
   } finally {
-    suppress = false;
+    // Set even if the fetch failed, so the UI can stop waiting and fall back
+    // to whatever's local rather than showing a loading state forever.
+    useGuides.setState({ initialSyncDone: true });
   }
 }
 
@@ -264,7 +270,7 @@ export async function refreshSharedGuides(): Promise<void> {
 export function clearLocalGuides(): void {
   suppress = true;
   try {
-    useGuides.setState({ guides: [] });
+    useGuides.setState({ guides: [], initialSyncDone: false });
     lastSynced.clear();
   } finally {
     suppress = false;
