@@ -1,4 +1,4 @@
-import type { Session, User } from '@supabase/supabase-js';
+import { FunctionsHttpError, type Session, type User } from '@supabase/supabase-js';
 import { create } from 'zustand';
 import { supabase } from '@/lib/supabase';
 
@@ -20,6 +20,7 @@ type AuthState = {
   /** Load the current session on boot and start listening for auth changes. */
   init: () => () => void;
   signOut: () => Promise<void>;
+  deleteAccount: () => Promise<void>;
   /** Persist the user's display name. */
   saveName: (name: string) => Promise<void>;
   /** Patch profile columns (e.g. avatar_url / avatar_color) and update state. */
@@ -66,6 +67,23 @@ export const useAuth = create<AuthState>()((set, get) => ({
   signOut: async () => {
     await supabase.auth.signOut();
     // onAuthStateChange will flip status to 'signedOut'.
+  },
+
+  deleteAccount: async () => {
+    const { error } = await supabase.functions.invoke('delete-account');
+    if (error) {
+      let detail = error.message;
+      if (error instanceof FunctionsHttpError) {
+        try {
+          const body = await error.context.clone().json();
+          if (typeof body?.error === 'string') detail = body.error;
+        } catch {
+          // body wasn't JSON — stick with the generic message
+        }
+      }
+      throw new Error(detail);
+    }
+    await supabase.auth.signOut();
   },
 
   saveName: async (name) => {

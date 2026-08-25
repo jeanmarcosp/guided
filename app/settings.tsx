@@ -34,6 +34,7 @@ export default function SettingsScreen() {
   const themeMode = useSettings((s) => s.themeMode);
   const setThemeMode = useSettings((s) => s.setThemeMode);
   const signOut = useAuth((s) => s.signOut);
+  const deleteAccount = useAuth((s) => s.deleteAccount);
   const profile = useAuth((s) => s.profile);
   const user = useAuth((s) => s.user);
   const updateProfile = useAuth((s) => s.updateProfile);
@@ -47,6 +48,7 @@ export default function SettingsScreen() {
   // The swatch the current avatar corresponds to (none while a photo is set).
   const activeColor = avatarUrl ? null : (avatarColor ?? colorFor(userId ?? name ?? '?'));
   const [avatarBusy, setAvatarBusy] = useState(false);
+  const [deleteBusy, setDeleteBusy] = useState(false);
   // The picked-but-not-yet-cropped image shown in the circular cropper overlay.
   const [cropSource, setCropSource] = useState<{
     uri: string;
@@ -131,6 +133,29 @@ export default function SettingsScreen() {
       { text: 'Cancel', style: 'cancel' },
       { text: 'Sign Out', style: 'destructive', onPress: () => void signOut() },
     ]);
+  }
+
+  function confirmDeleteAccount() {
+    Alert.alert(
+      'Delete account?',
+      'This permanently deletes your account and every guide you own — including for anyone you’ve shared them with. Guides others have shared with you are just removed from your view. This cannot be undone.',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        { text: 'Delete Account', style: 'destructive', onPress: onDeleteAccount },
+      ],
+    );
+  }
+
+  async function onDeleteAccount() {
+    try {
+      setDeleteBusy(true);
+      await deleteAccount();
+      // Success flips auth status to 'signedOut'; the root layout redirects
+      // to sign-in on its own — nothing left to do on this screen.
+    } catch (e: any) {
+      setDeleteBusy(false);
+      Alert.alert('Could not delete account', e?.message ?? 'Please try again.');
+    }
   }
 
   function goBack() {
@@ -306,6 +331,23 @@ export default function SettingsScreen() {
           <Ionicons name="log-out-outline" size={20} color={colors.danger} />
           <Text style={[typography.body, { color: colors.danger }]}>Sign Out</Text>
         </Pressable>
+        <Pressable
+          onPress={confirmDeleteAccount}
+          disabled={deleteBusy}
+          style={({ pressed }) => [
+            styles.rowBtn,
+            styles.deleteRowBtn,
+            { backgroundColor: colors.surface, borderColor: colors.border },
+            (pressed || deleteBusy) && { opacity: 0.6 },
+          ]}
+        >
+          {deleteBusy ? (
+            <ActivityIndicator color={colors.danger} />
+          ) : (
+            <Ionicons name="trash-outline" size={20} color={colors.danger} />
+          )}
+          <Text style={[typography.body, { color: colors.danger }]}>Delete Account</Text>
+        </Pressable>
       </ScrollView>
 
       {cropSource && (
@@ -414,4 +456,5 @@ const styles = StyleSheet.create({
     borderRadius: radius.md,
     borderWidth: StyleSheet.hairlineWidth,
   },
+  deleteRowBtn: { marginTop: spacing.sm },
 });

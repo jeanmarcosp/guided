@@ -38,3 +38,6 @@ secret = "env(SUPABASE_AUTH_APPLE_SECRET)"
 
 [functions.foursquare-search]
 verify_jwt = true
+
+[functions.delete-account]
+verify_jwt = true

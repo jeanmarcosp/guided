@@ -9,7 +9,14 @@
     "userInterfaceStyle": "automatic",
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "com.anonymous.guided"
+      "bundleIdentifier": "com.anonymous.guided",
+      "buildNumber": "1",
+      "infoPlist": {
+        "ITSAppUsesNonExemptEncryption": false,
+        "NSCameraUsageDescription": "Guided doesn't use the camera.",
+        "NSMicrophoneUsageDescription": "Guided doesn't use the microphone.",
+        "NSFaceIDUsageDescription": "Guided doesn't use Face ID."
+      }
     },
     "android": {
       "adaptiveIcon": {
