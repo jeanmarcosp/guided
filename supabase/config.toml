@@ -1,12 +1,18 @@
 # Supabase local dev config. Regenerate with `supabase init` if your CLI version
 # expects a different shape; the important custom bits are the [auth] providers
 # and the JWT-verified edge function below.
+#
+# `supabase config push` syncs this file to the remote project's Auth/API/
+# Storage settings — it's not just local-dev config. Keep every field that
+# matters explicit here; anything left out gets pushed as this CLI version's
+# default, which silently clobbers whatever was actually configured on the
+# live project (this happened once already — see git history on this file).
 project_id = "guided"
 
 [api]
 enabled = true
 port = 54321
-schemas = ["public"]
+schemas = ["public", "graphql_public"]
 extra_search_path = ["public", "extensions"]
 max_rows = 1000
 
@@ -21,7 +27,7 @@ port = 54323
 [auth]
 enabled = true
 site_url = "guided://"
-additional_redirect_urls = ["guided://callback", "guided://share"]
+additional_redirect_urls = ["guided://callback", "guided://share/*", "guided://**"]
 jwt_expiry = 3600
 enable_refresh_token_rotation = true
 
@@ -29,12 +35,21 @@ enable_refresh_token_rotation = true
 enable_signup = true
 # Magic-link / OTP sign-in (no passwords).
 enable_confirmations = false
+max_frequency = "1m0s"
+otp_length = 8
+otp_expiry = 3600
+
+[auth.mfa.totp]
+enroll_enabled = true
+verify_enabled = true
 
 [auth.external.apple]
-enabled = true
-# Fill these from your Apple Developer account (see ONBOARDING / setup checklist).
-client_id = "env(SUPABASE_AUTH_APPLE_CLIENT_ID)"
-secret = "env(SUPABASE_AUTH_APPLE_SECRET)"
+enabled = false
+client_id = ""
+secret = ""
+
+[storage.vector]
+enabled = false
 
 [functions.foursquare-search]
 verify_jwt = true
