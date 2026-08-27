@@ -1,6 +1,6 @@
 {
   "expo": {
-    "name": "Guided",
+    "name": "Guided Maps",
     "slug": "guided",
     "version": "1.0.0",
     "scheme": "guided",
@@ -9,7 +9,7 @@
     "userInterfaceStyle": "automatic",
     "ios": {
       "supportsTablet": false,
-      "bundleIdentifier": "com.anonymous.guided",
+      "bundleIdentifier": "com.guidedmaps.app",
       "buildNumber": "1",
       "infoPlist": {
         "ITSAppUsesNonExemptEncryption": false
@@ -27,7 +27,7 @@
         "android.permission.ACCESS_COARSE_LOCATION",
         "android.permission.ACCESS_FINE_LOCATION"
       ],
-      "package": "com.anonymous.guided"
+      "package": "com.guidedmaps.app"
     },
     "web": {
       "favicon": "./assets/favicon.png"
