@@ -1,7 +1,7 @@
 import { supabase } from '@/lib/supabase';
 
 /**
- * Send a 6-digit one-time code to the email. Codes are more reliable than magic
+ * Send a 8-digit one-time code to the email. Codes are more reliable than magic
  * links on mobile (no deep-link round-trip, no link pre-fetching). Requires the
  * email template to render `{{ .Token }}` — see BACKEND_SETUP.md.
  * `shouldCreateUser` lets first-time users sign up.
@@ -14,7 +14,7 @@ export async function sendEmailCode(email: string) {
   if (error) throw error;
 }
 
-/** Verify the 6-digit code and establish a session. */
+/** Verify the 8-digit code and establish a session. */
 export async function verifyEmailCode(email: string, code: string) {
   const { error } = await supabase.auth.verifyOtp({
     email: email.trim(),

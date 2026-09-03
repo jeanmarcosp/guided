@@ -33,7 +33,7 @@ Security policies, and the `accept_share_token` RPC.
 
 ## 3. Auth: email code (Apple Sign In deferred)
 
-Sign-in uses a **6-digit email code** (`signInWithOtp` + `verifyOtp`), which
+Sign-in uses a **8-digit email code** (`signInWithOtp` + `verifyOtp`), which
 needs custom SMTP (the built-in email service is rate-limited to a couple/hour
 and can't edit templates). Configure **Custom SMTP** under
 **Authentication → Emails → SMTP Settings**.
