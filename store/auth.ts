@@ -65,8 +65,15 @@ export const useAuth = create<AuthState>()((set, get) => ({
   },
 
   signOut: async () => {
-    await supabase.auth.signOut();
+    const { error } = await supabase.auth.signOut();
     // onAuthStateChange will flip status to 'signedOut'.
+    if (!error) return;
+    // supabase resolves with an error instead of rejecting, and most of its
+    // failure paths still clear the local session — the user IS signed out.
+    // Only the ones that left a session behind are worth reporting; throwing on
+    // the rest would make callers show a failure for a sign-out that worked.
+    const { data } = await supabase.auth.getSession();
+    if (data.session) throw error;
   },
 
   deleteAccount: async () => {

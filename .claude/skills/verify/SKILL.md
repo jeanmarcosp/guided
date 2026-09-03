@@ -26,4 +26,4 @@ Recipe for exercising changes in the real app. Expo dev-client + Metro; no Expo 
 - Crash reports land in `~/Library/Logs/DiagnosticReports/Guided-*.ips` (JSON; first line meta, rest body).
 - lldb attach works on the dev build (breakpoints in Guided.debug.dylib symbols). NEVER SIGKILL lldb while breakpoints are set — orphaned `brk` patches SIGTRAP-crash the app and can wedge the simulator (fix: `xcrun simctl shutdown <udid> && boot`, app data survives).
 - JS console.log does NOT reach os_log; Metro's stdout runs in the user's terminal. Prefer screenshots + lldb for runtime evidence.
-- react-native-maps mutation rules: see comments in `components/GuideMap.tsx` (fixed marker pool; never add/remove map children on zoom; never use Marker `opacity`).
+- react-native-maps mutation rules: see comments in `components/GuideMap.tsx` (fixed marker pool; never add/remove map children on zoom; never use Marker `opacity` — it sets the native alpha MapKit also animates, and gets stuck part-way; hide a marker by drawing nothing inside it, keeping its child view `collapsable={false}` and its frame constant).

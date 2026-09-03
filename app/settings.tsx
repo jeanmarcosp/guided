@@ -15,6 +15,7 @@ import {
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Avatar, { AVATAR_COLORS, colorFor } from '@/components/Avatar';
 import AvatarCropper from '@/components/AvatarCropper';
+import BusyOverlay from '@/components/BusyOverlay';
 import { deleteAvatar, uploadAvatar } from '@/lib/api/profile';
 import { useAuth } from '@/store/auth';
 import { useSettings, type ThemeMode } from '@/store/settings';
@@ -48,6 +49,7 @@ export default function SettingsScreen() {
   // The swatch the current avatar corresponds to (none while a photo is set).
   const activeColor = avatarUrl ? null : (avatarColor ?? colorFor(userId ?? name ?? '?'));
   const [avatarBusy, setAvatarBusy] = useState(false);
+  const [signOutBusy, setSignOutBusy] = useState(false);
   const [deleteBusy, setDeleteBusy] = useState(false);
   // The picked-but-not-yet-cropped image shown in the circular cropper overlay.
   const [cropSource, setCropSource] = useState<{
@@ -131,8 +133,20 @@ export default function SettingsScreen() {
   function confirmSignOut() {
     Alert.alert('Sign out?', 'Your guides stay safe in the cloud.', [
       { text: 'Cancel', style: 'cancel' },
-      { text: 'Sign Out', style: 'destructive', onPress: () => void signOut() },
+      { text: 'Sign Out', style: 'destructive', onPress: onSignOut },
     ]);
+  }
+
+  async function onSignOut() {
+    try {
+      setSignOutBusy(true);
+      await signOut();
+      // Success flips auth status to 'signedOut' and the root layout redirects
+      // to sign-in, so leave the spinner up until this screen goes away.
+    } catch (e: any) {
+      setSignOutBusy(false);
+      Alert.alert('Could not sign out', e?.message ?? 'Please try again.');
+    }
   }
 
   function confirmDeleteAccount() {
@@ -164,13 +178,11 @@ export default function SettingsScreen() {
   }
 
   return (
-    <View
-      style={[
-        styles.fill,
-        { backgroundColor: colors.background, paddingTop: insets.top + spacing.sm },
-      ]}
-    >
-      <View style={styles.header}>
+    <View style={[styles.fill, { backgroundColor: colors.background }]}>
+      {/* The safe-area inset lives on the header, not this root, so BusyOverlay
+          below can cover the status bar too: React Native resolves absolute
+          offsets against the padding box, so padding here would inset it. */}
+      <View style={[styles.header, { paddingTop: insets.top + spacing.sm }]}>
         <Pressable onPress={goBack} hitSlop={8} style={styles.backBtn}>
           <Ionicons name="chevron-back" size={24} color={colors.textPrimary} />
         </Pressable>
@@ -322,6 +334,7 @@ export default function SettingsScreen() {
         </Text>
         <Pressable
           onPress={confirmSignOut}
+          disabled={signOutBusy || deleteBusy}
           style={({ pressed }) => [
             styles.rowBtn,
             { backgroundColor: colors.surface, borderColor: colors.border },
@@ -333,12 +346,12 @@ export default function SettingsScreen() {
         </Pressable>
         <Pressable
           onPress={confirmDeleteAccount}
-          disabled={deleteBusy}
+          disabled={deleteBusy || signOutBusy}
           style={({ pressed }) => [
             styles.rowBtn,
             styles.deleteRowBtn,
             { backgroundColor: colors.surface, borderColor: colors.border },
-            (pressed || deleteBusy) && { opacity: 0.6 },
+            (pressed || deleteBusy || signOutBusy) && { opacity: 0.6 },
           ]}
         >
           {deleteBusy ? (
@@ -359,6 +372,8 @@ export default function SettingsScreen() {
           onDone={applyCroppedAvatar}
         />
       )}
+
+      <BusyOverlay visible={signOutBusy} label="Signing out…" />
     </View>
   );
 }

@@ -97,6 +97,11 @@ export default function GuideDetail() {
     [layers],
   );
 
+  const layerEmojis = useMemo(
+    () => Object.fromEntries(layers.map((l) => [l.id, l.emoji])),
+    [layers],
+  );
+
   // Places whose layer isn't hidden — what the map actually shows.
   const visiblePlaces = useMemo(() => {
     const hiddenIds = new Set(layers.filter((l) => l.hidden).map((l) => l.id));
@@ -381,6 +386,7 @@ export default function GuideDetail() {
         ref={mapRef}
         places={visiblePlaces}
         layerColors={layerColors}
+        layerEmojis={layerEmojis}
         initialRegion={DEFAULT_REGION}
         onMarkerPress={focusPlace}
         onAutoCameraMove={() => {

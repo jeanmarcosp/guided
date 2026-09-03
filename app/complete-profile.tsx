@@ -11,6 +11,7 @@ import {
   View,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import BusyOverlay from '@/components/BusyOverlay';
 import { useAuth } from '@/store/auth';
 import { radius, spacing, typography, useColors } from '@/theme/tokens';
 
@@ -21,6 +22,7 @@ export default function CompleteProfileScreen() {
 
   const [name, setName] = useState('');
   const [busy, setBusy] = useState(false);
+  const [signOutBusy, setSignOutBusy] = useState(false);
 
   const onSubmit = async () => {
     if (!name.trim()) {
@@ -38,60 +40,81 @@ export default function CompleteProfileScreen() {
     }
   };
 
-  return (
-    <SafeAreaView style={[styles.safeArea, { backgroundColor: colors.background }]}>
-      <KeyboardAvoidingView
-        style={styles.container}
-        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-      >
-        <View style={styles.header}>
-          <Text style={styles.emoji}>👋</Text>
-          <Text style={[typography.largeTitle, { color: colors.textPrimary }]}>
-            What&rsquo;s your name?
-          </Text>
-          <Text style={[typography.body, { color: colors.textSecondary, textAlign: 'center' }]}>
-            We&rsquo;ll use it on the guides and places you share with friends.
-          </Text>
-        </View>
+  const onSignOut = async () => {
+    try {
+      setSignOutBusy(true);
+      await signOut();
+      // Success routes away from this screen; keep the spinner until it does.
+    } catch (e: any) {
+      setSignOutBusy(false);
+      Alert.alert('Could not sign out', e?.message ?? 'Please try again.');
+    }
+  };
 
-        <View style={styles.actions}>
-          <TextInput
-            value={name}
-            onChangeText={setName}
-            placeholder="Full name"
-            placeholderTextColor={colors.textTertiary}
-            autoCapitalize="words"
-            autoCorrect={false}
-            textContentType="name"
-            returnKeyType="done"
-            autoFocus
-            onSubmitEditing={onSubmit}
-            style={[
-              styles.input,
-              {
-                backgroundColor: colors.surface,
-                borderColor: colors.border,
-                color: colors.textPrimary,
-              },
-            ]}
-          />
-          <Pressable
-            onPress={onSubmit}
-            disabled={busy}
-            style={[styles.button, { backgroundColor: colors.accent, opacity: busy ? 0.6 : 1 }]}
-          >
-            {busy ? (
-              <ActivityIndicator color="#fff" />
-            ) : (
-              <Text style={[typography.bodyMedium, { color: '#fff' }]}>Continue</Text>
-            )}
-          </Pressable>
-          <Pressable onPress={() => void signOut()} hitSlop={8} style={styles.linkBtn}>
-            <Text style={[typography.caption, { color: colors.textTertiary }]}>Sign out</Text>
-          </Pressable>
-        </View>
-      </KeyboardAvoidingView>
-    </SafeAreaView>
+  return (
+    <View style={[styles.safeArea, { backgroundColor: colors.background }]}>
+      <SafeAreaView style={styles.safeArea}>
+        <KeyboardAvoidingView
+          style={styles.container}
+          behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+        >
+          <View style={styles.header}>
+            <Text style={styles.emoji}>👋</Text>
+            <Text style={[typography.largeTitle, { color: colors.textPrimary }]}>
+              What&rsquo;s your name?
+            </Text>
+            <Text style={[typography.body, { color: colors.textSecondary, textAlign: 'center' }]}>
+              We&rsquo;ll use it on the guides and places you share with friends.
+            </Text>
+          </View>
+
+          <View style={styles.actions}>
+            <TextInput
+              value={name}
+              onChangeText={setName}
+              placeholder="Full name"
+              placeholderTextColor={colors.textTertiary}
+              autoCapitalize="words"
+              autoCorrect={false}
+              textContentType="name"
+              returnKeyType="done"
+              autoFocus
+              onSubmitEditing={onSubmit}
+              style={[
+                styles.input,
+                {
+                  backgroundColor: colors.surface,
+                  borderColor: colors.border,
+                  color: colors.textPrimary,
+                },
+              ]}
+            />
+            <Pressable
+              onPress={onSubmit}
+              disabled={busy}
+              style={[styles.button, { backgroundColor: colors.accent, opacity: busy ? 0.6 : 1 }]}
+            >
+              {busy ? (
+                <ActivityIndicator color="#fff" />
+              ) : (
+                <Text style={[typography.bodyMedium, { color: '#fff' }]}>Continue</Text>
+              )}
+            </Pressable>
+            <Pressable
+              onPress={onSignOut}
+              disabled={signOutBusy || busy}
+              hitSlop={8}
+              style={[styles.linkBtn, (signOutBusy || busy) && { opacity: 0.6 }]}
+            >
+              <Text style={[typography.caption, { color: colors.textTertiary }]}>Sign out</Text>
+            </Pressable>
+          </View>
+        </KeyboardAvoidingView>
+      </SafeAreaView>
+
+      {/* Outside SafeAreaView so the scrim covers the insets too. */}
+      <BusyOverlay visible={signOutBusy} label="Signing out…" />
+    </View>
   );
 }
 
