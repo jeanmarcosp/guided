@@ -13,7 +13,20 @@ type RawResult = {
   longitude: number;
   address?: string;
   category?: string;
+  /** Stable Apple Maps Place ID (MKMapItem.identifier, iOS 18+). */
+  appleId?: string;
 };
+
+function rawToResult(r: RawResult): SearchResult {
+  return {
+    name: r.name,
+    latitude: r.latitude,
+    longitude: r.longitude,
+    address: r.address,
+    category: prettifyCategory(r.category),
+    applePlaceId: r.appleId,
+  };
+}
 
 /** "MKPOICategoryRestaurant" -> "restaurant" */
 function prettifyCategory(raw?: string): string | undefined {
@@ -37,13 +50,7 @@ export async function searchApple(
     near?.latitude ?? null,
     near?.longitude ?? null,
   );
-  return raw.map((r) => ({
-    name: r.name,
-    latitude: r.latitude,
-    longitude: r.longitude,
-    address: r.address,
-    category: prettifyCategory(r.category),
-  }));
+  return raw.map(rawToResult);
 }
 
 /** A type-ahead suggestion from MKLocalSearchCompleter — no coordinates yet. */
@@ -81,13 +88,7 @@ export async function resolveAppleCompletion(
   if (!AppleSearch) throw new Error('AppleSearch native module is unavailable');
   try {
     const raw: RawResult = await AppleSearch.resolveCompletion(completion.index, completion.title);
-    return {
-      name: raw.name,
-      latitude: raw.latitude,
-      longitude: raw.longitude,
-      address: raw.address,
-      category: prettifyCategory(raw.category),
-    };
+    return rawToResult(raw);
   } catch {
     const results = await searchApple(completion.title, near);
     if (results.length === 0) throw new Error('No match for suggestion');
@@ -96,13 +97,29 @@ export async function resolveAppleCompletion(
 }
 
 /**
- * Open the real Apple POI (place card with photos/reviews) in Apple Maps,
- * resolved by name near the given coordinate.
+ * Open the real Apple POI (place card with photos/reviews) in the Apple Maps
+ * app. A stored Place ID resolves the exact POI; otherwise the closest name
+ * match near the coordinate. Resolves with the opened item's Place ID.
  */
 export async function openInMaps(
   query: string,
   near: { latitude: number; longitude: number },
-): Promise<boolean> {
+  applePlaceId?: string,
+): Promise<string | null> {
   if (!AppleSearch) throw new Error('AppleSearch native module is unavailable');
-  return AppleSearch.openInMaps(query, near.latitude, near.longitude);
+  return AppleSearch.openInMaps(query, near.latitude, near.longitude, applePlaceId ?? null);
+}
+
+/**
+ * Show the full native Apple Maps place card inside the app
+ * (MKMapItemDetailViewController, iOS 18+; earlier iOS opens the Maps app).
+ * Resolves with the shown item's Place ID.
+ */
+export async function showPlaceCard(
+  query: string,
+  near: { latitude: number; longitude: number },
+  applePlaceId?: string,
+): Promise<string | null> {
+  if (!AppleSearch) throw new Error('AppleSearch native module is unavailable');
+  return AppleSearch.showPlaceCard(query, near.latitude, near.longitude, applePlaceId ?? null);
 }

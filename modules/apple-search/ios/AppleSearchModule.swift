@@ -16,6 +16,14 @@ private final class CompleterDelegate: NSObject, MKLocalSearchCompleterDelegate 
   }
 }
 
+/// Dismisses the in-app place card when its close button is tapped.
+@available(iOS 18.0, *)
+private final class PlaceCardDelegate: NSObject, MKMapItemDetailViewControllerDelegate {
+  func mapItemDetailViewControllerDidFinish(_ detailViewController: MKMapItemDetailViewController) {
+    detailViewController.dismiss(animated: true)
+  }
+}
+
 /**
  * Wraps Apple's MKLocalSearch so JS can query the same place database that
  * powers Apple Maps. No API key or Apple Developer account required.
@@ -27,6 +35,9 @@ public class AppleSearchModule: Module {
   private var pendingCompletions: Promise?
   private var lastCompletions: [MKLocalSearchCompletion] = []
   private var lastPayload: [[String: Any]] = []
+  /// Retains the in-app place card's delegate while a card is up (AnyObject so
+  /// the stored property needs no iOS 18 availability).
+  private var placeCardDelegate: AnyObject?
 
   public func definition() -> ModuleDefinition {
     Name("AppleSearch")
@@ -76,19 +87,7 @@ public class AppleSearchModule: Module {
             promise.reject("APPLE_SEARCH_ERROR", error?.localizedDescription ?? "No match found")
             return
           }
-          let placemark = item.placemark
-          var dict: [String: Any] = [
-            "name": item.name ?? placemark.name ?? "Unnamed place",
-            "latitude": placemark.coordinate.latitude,
-            "longitude": placemark.coordinate.longitude,
-          ]
-          if let address = AppleSearchModule.formatAddress(placemark) {
-            dict["address"] = address
-          }
-          if let category = item.pointOfInterestCategory?.rawValue {
-            dict["category"] = category
-          }
-          promise.resolve(dict)
+          promise.resolve(AppleSearchModule.placeDict(item))
         }
       }
     }
@@ -115,67 +114,142 @@ public class AppleSearchModule: Module {
             return
           }
 
-          let results: [[String: Any]] = (response?.mapItems ?? []).map { item in
-            let placemark = item.placemark
-            var dict: [String: Any] = [
-              "name": item.name ?? placemark.name ?? "Unnamed place",
-              "latitude": placemark.coordinate.latitude,
-              "longitude": placemark.coordinate.longitude,
-            ]
-            if let address = AppleSearchModule.formatAddress(placemark) {
-              dict["address"] = address
-            }
-            if let category = item.pointOfInterestCategory?.rawValue {
-              dict["category"] = category
-            }
-            return dict
-          }
-
+          let results = (response?.mapItems ?? []).map(AppleSearchModule.placeDict)
           promise.resolve(results)
         }
       }
     }
 
-    // Resolve the real Apple POI nearest the coordinate and open its place card
-    // (photos/reviews/hours) in Apple Maps — same as MKMapItem.openInMaps().
+    // Open the place card (photos/reviews/hours) in the Apple Maps app.
+    // A stored Place ID resolves the exact POI; otherwise fall back to the
+    // closest name match near the coordinate. Resolves with the item's Place
+    // ID (or nil) so callers could persist it.
     AsyncFunction("openInMaps") {
-      (query: String, latitude: Double, longitude: Double, promise: Promise) in
+      (query: String, latitude: Double, longitude: Double, appleId: String?, promise: Promise) in
       DispatchQueue.main.async {
-        let center = CLLocationCoordinate2D(latitude: latitude, longitude: longitude)
-        let target = CLLocation(latitude: latitude, longitude: longitude)
-
-        let request = MKLocalSearch.Request()
-        request.naturalLanguageQuery = query
-        request.region = MKCoordinateRegion(
-          center: center,
-          latitudinalMeters: 1200,
-          longitudinalMeters: 1200
-        )
-
-        let search = MKLocalSearch(request: request)
-        search.start { (response, _) in
-          let items = response?.mapItems ?? []
-          // Pick the result closest to the saved coordinate (disambiguates
-          // generic names like "Starbucks").
-          let best = items.min { a, b in
-            let la = CLLocation(latitude: a.placemark.coordinate.latitude, longitude: a.placemark.coordinate.longitude)
-            let lb = CLLocation(latitude: b.placemark.coordinate.latitude, longitude: b.placemark.coordinate.longitude)
-            return la.distance(from: target) < lb.distance(from: target)
-          }
-
-          let item: MKMapItem
-          if let match = best {
-            item = match
-          } else {
-            // Fallback: a plain pin at the coordinate.
-            item = MKMapItem(placemark: MKPlacemark(coordinate: center))
-            item.name = query
-          }
+        self.resolveItem(appleId: appleId, query: query, latitude: latitude, longitude: longitude) {
+          item in
           item.openInMaps(launchOptions: nil)
-          promise.resolve(best != nil)
+          promise.resolve(AppleSearchModule.placeId(of: item))
         }
       }
     }
+
+    // Show the full native place card INSIDE the app (MKMapItemDetailViewController,
+    // iOS 18+). Pre-18 falls back to opening the Apple Maps app.
+    AsyncFunction("showPlaceCard") {
+      (query: String, latitude: Double, longitude: Double, appleId: String?, promise: Promise) in
+      DispatchQueue.main.async {
+        self.resolveItem(appleId: appleId, query: query, latitude: latitude, longitude: longitude) {
+          item in
+          if #available(iOS 18.0, *) {
+            guard let presenter = self.appContext?.utilities?.currentViewController() else {
+              item.openInMaps(launchOptions: nil)
+              promise.resolve(AppleSearchModule.placeId(of: item))
+              return
+            }
+            let detail = MKMapItemDetailViewController(mapItem: item)
+            let delegate = PlaceCardDelegate()
+            self.placeCardDelegate = delegate // retained until the next card
+            detail.delegate = delegate
+            presenter.present(detail, animated: true)
+          } else {
+            item.openInMaps(launchOptions: nil)
+          }
+          promise.resolve(AppleSearchModule.placeId(of: item))
+        }
+      }
+    }
+  }
+
+  /// Resolve a place to its MKMapItem: exact lookup by stable Place ID when
+  /// one is stored (iOS 18+), otherwise the closest name match near the
+  /// coordinate, otherwise a plain pin. Always calls back on the main queue.
+  private func resolveItem(
+    appleId: String?,
+    query: String,
+    latitude: Double,
+    longitude: Double,
+    completion: @escaping (MKMapItem) -> Void
+  ) {
+    if #available(iOS 18.0, *), let raw = appleId, let identifier = MKMapItem.Identifier(rawValue: raw) {
+      MKMapItemRequest(mapItemIdentifier: identifier).getMapItem { item, _ in
+        DispatchQueue.main.async {
+          if let item {
+            completion(item)
+          } else {
+            // The ID went stale (place removed/superseded) — fuzzy fallback.
+            AppleSearchModule.closestMatch(query: query, latitude: latitude, longitude: longitude, completion: completion)
+          }
+        }
+      }
+      return
+    }
+    AppleSearchModule.closestMatch(query: query, latitude: latitude, longitude: longitude, completion: completion)
+  }
+
+  /// The pre-Place-ID heuristic: search the name near the coordinate and pick
+  /// the closest hit (disambiguates generic names like "Starbucks"); a plain
+  /// pin when nothing matches.
+  private static func closestMatch(
+    query: String,
+    latitude: Double,
+    longitude: Double,
+    completion: @escaping (MKMapItem) -> Void
+  ) {
+    let center = CLLocationCoordinate2D(latitude: latitude, longitude: longitude)
+    let target = CLLocation(latitude: latitude, longitude: longitude)
+
+    let request = MKLocalSearch.Request()
+    request.naturalLanguageQuery = query
+    request.region = MKCoordinateRegion(
+      center: center,
+      latitudinalMeters: 1200,
+      longitudinalMeters: 1200
+    )
+
+    MKLocalSearch(request: request).start { (response, _) in
+      let best = (response?.mapItems ?? []).min { a, b in
+        let la = CLLocation(latitude: a.placemark.coordinate.latitude, longitude: a.placemark.coordinate.longitude)
+        let lb = CLLocation(latitude: b.placemark.coordinate.latitude, longitude: b.placemark.coordinate.longitude)
+        return la.distance(from: target) < lb.distance(from: target)
+      }
+      if let best {
+        completion(best)
+      } else {
+        let pin = MKMapItem(placemark: MKPlacemark(coordinate: center))
+        pin.name = query
+        completion(pin)
+      }
+    }
+  }
+
+  /// The stable Apple Maps Place ID, when the OS and the item have one.
+  private static func placeId(of item: MKMapItem) -> String? {
+    if #available(iOS 18.0, *) {
+      return item.identifier?.rawValue
+    }
+    return nil
+  }
+
+  /// Serialized place for JS — shared by search results and completion resolution.
+  private static func placeDict(_ item: MKMapItem) -> [String: Any] {
+    let placemark = item.placemark
+    var dict: [String: Any] = [
+      "name": item.name ?? placemark.name ?? "Unnamed place",
+      "latitude": placemark.coordinate.latitude,
+      "longitude": placemark.coordinate.longitude,
+    ]
+    if let address = formatAddress(placemark) {
+      dict["address"] = address
+    }
+    if let category = item.pointOfInterestCategory?.rawValue {
+      dict["category"] = category
+    }
+    if let appleId = placeId(of: item) {
+      dict["appleId"] = appleId
+    }
+    return dict
   }
 
   /// Lazy single completer — one per app is plenty; it self-throttles and

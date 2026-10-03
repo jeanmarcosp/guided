@@ -8,6 +8,8 @@ export type Place = {
   addedAt: number;
   layerId?: string; // which layer this place belongs to
   addedBy?: string; // server user id of who added it (collaboration attribution)
+  /** Apple Maps stable Place ID (MKMapItem.identifier, iOS 18+) — opens the exact place card. */
+  applePlaceId?: string;
 };
 
 export type Layer = {

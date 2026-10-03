@@ -8,7 +8,7 @@ import {
   type Region,
   type RegionChangeEvent,
 } from '@/modules/guided-map';
-import { openPlaceInAppleMaps } from '@/lib/maps';
+import { showPlaceCardInApp } from '@/lib/maps';
 import type { Place } from '@/lib/types';
 
 const FALLBACK_COLOR = '#8E8E93';
@@ -69,12 +69,12 @@ const GuideMap = forwardRef<GuidedMapRef, Props>(function GuideMap(
     [placesById, onMarkerPress],
   );
 
-  // The callout's open button: resolve the real Apple POI and show its place
-  // card in Apple Maps, same as the old app-drawn callout did.
+  // The callout's info button: show the native place card (photos/reviews)
+  // inside the app. The long-press menu still offers "Open in Apple Maps".
   const handleCalloutAccessoryPress = useCallback(
     (id: string) => {
       const place = placesById.get(id);
-      if (place) openPlaceInAppleMaps(place);
+      if (place) showPlaceCardInApp(place);
     },
     [placesById],
   );

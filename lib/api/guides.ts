@@ -125,6 +125,7 @@ export async function insertPlaceRemote(
     longitude: place.longitude,
     category: place.category ?? null,
     added_by: place.addedBy ?? userId,
+    apple_place_id: place.applePlaceId ?? null,
   });
   if (error) {
     if (error.code === '23505') return; // coordinate/id dedupe: already present
@@ -143,6 +144,7 @@ export async function updatePlaceRemote(place: Place): Promise<void> {
       latitude: place.latitude,
       longitude: place.longitude,
       category: place.category ?? null,
+      apple_place_id: place.applePlaceId ?? null,
     })
     .eq('id', place.id);
   if (error) throw error;
@@ -253,6 +255,7 @@ export async function pushGuide(guide: Guide, ownerId: string): Promise<void> {
     longitude: p.longitude,
     category: p.category ?? null,
     added_by: p.addedBy ?? ownerId,
+    apple_place_id: p.applePlaceId ?? null,
   }));
   if (placeRows.length > 0) {
     const { error } = await supabase.from('places').upsert(placeRows);

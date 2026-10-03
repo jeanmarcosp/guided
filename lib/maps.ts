@@ -1,5 +1,5 @@
 import { Linking } from 'react-native';
-import { isAppleSearchAvailable, openInMaps } from '@/modules/apple-search';
+import { isAppleSearchAvailable, openInMaps, showPlaceCard } from '@/modules/apple-search';
 import type { Place } from '@/lib/types';
 
 /** URL fallback: search Apple Maps for the place, biased to its coordinate. */
@@ -10,14 +10,34 @@ function openViaUrl(place: Place) {
 }
 
 /**
- * Open a place in Apple Maps. Prefers the native module (resolves the real POI
- * and opens its place card with photos/reviews); falls back to a URL search.
+ * Open a place in the Apple Maps app. A stored Place ID opens the exact place
+ * card; legacy places resolve by name near their coordinate. Falls back to a
+ * URL search without the native module.
  */
 export function openPlaceInAppleMaps(place: Place) {
   if (isAppleSearchAvailable) {
-    openInMaps(place.name, { latitude: place.latitude, longitude: place.longitude }).catch(() =>
-      openViaUrl(place),
-    );
+    openInMaps(
+      place.name,
+      { latitude: place.latitude, longitude: place.longitude },
+      place.applePlaceId,
+    ).catch(() => openViaUrl(place));
+    return;
+  }
+  openViaUrl(place);
+}
+
+/**
+ * Show the native Apple Maps place card (photos/reviews/hours) INSIDE the app
+ * — iOS 18+'s MKMapItemDetailViewController. Earlier iOS or resolution
+ * failures fall back to the Apple Maps app.
+ */
+export function showPlaceCardInApp(place: Place) {
+  if (isAppleSearchAvailable) {
+    showPlaceCard(
+      place.name,
+      { latitude: place.latitude, longitude: place.longitude },
+      place.applePlaceId,
+    ).catch(() => openViaUrl(place));
     return;
   }
   openViaUrl(place);

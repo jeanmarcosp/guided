@@ -160,7 +160,11 @@ class GuidedMapView: ExpoView, MKMapViewDelegate {
   private func isUserInteracting() -> Bool {
     guard let recognizers = mapView.subviews.first?.gestureRecognizers else { return false }
     return recognizers.contains {
-      $0.state == .began || $0.state == .changed || $0.state == .ended
+      // Camera-moving gestures only. A plain tap also lands here in .ended
+      // state while MapKit pans to fit a selected pin's callout — that move is
+      // MapKit's, not the user's, and must not read as a user pan.
+      ($0 is UIPanGestureRecognizer || $0 is UIPinchGestureRecognizer || $0 is UIRotationGestureRecognizer)
+        && ($0.state == .began || $0.state == .changed || $0.state == .ended)
     }
   }
 

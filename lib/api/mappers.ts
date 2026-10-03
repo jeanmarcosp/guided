@@ -43,6 +43,7 @@ export type PlaceRow = {
   longitude: number;
   category: string | null;
   added_by: string | null;
+  apple_place_id: string | null;
   created_at: string;
   updated_at: string;
 };
@@ -76,6 +77,7 @@ export function placeRowToPlace(r: PlaceRow): Place {
     addedAt: ms(r.created_at),
     layerId: r.layer_id ?? undefined,
     addedBy: r.added_by ?? undefined,
+    applePlaceId: r.apple_place_id ?? undefined,
   };
 }
 
