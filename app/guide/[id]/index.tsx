@@ -1,5 +1,5 @@
 import BottomSheet, { BottomSheetSectionList } from '@gorhom/bottom-sheet';
-import { Ionicons } from '@expo/vector-icons';
+import Icon from '@/components/Icon';
 import * as Haptics from 'expo-haptics';
 import * as Location from 'expo-location';
 import { useLocalSearchParams, useRouter } from 'expo-router';
@@ -382,7 +382,7 @@ export default function GuideDetail() {
           style={[styles.circleBtn, { backgroundColor: colors.surface }]}
           hitSlop={8}
         >
-          <Ionicons name="chevron-back" size={22} color={colors.textPrimary} />
+          <Icon name="chevron.left" size={22} color={colors.textPrimary} />
         </Pressable>
         <View style={[styles.titlePill, { backgroundColor: colors.surface }]}>
           <Text style={styles.titleEmoji}>{guide.emoji}</Text>
@@ -398,7 +398,7 @@ export default function GuideDetail() {
           style={[styles.circleBtn, { backgroundColor: colors.surface }]}
           hitSlop={8}
         >
-          <Ionicons name="settings-outline" size={20} color={colors.textPrimary} />
+          <Icon name="gearshape" size={20} color={colors.textPrimary} />
         </Pressable>
       </View>
 
@@ -413,7 +413,7 @@ export default function GuideDetail() {
               pressed && { opacity: 0.7 },
             ]}
           >
-            <Ionicons name="search" size={15} color={colors.accent} />
+            <Icon name="magnifyingglass" size={15} color={colors.accent} />
             <Text style={[typography.caption, styles.searchAreaText, { color: colors.accent }]}>
               Search this area
             </Text>
@@ -428,21 +428,21 @@ export default function GuideDetail() {
           style={[styles.recenterBtn, { backgroundColor: colors.surface }]}
           hitSlop={8}
         >
-          <Ionicons name="add" size={24} color={colors.textPrimary} />
+          <Icon name="plus" size={24} color={colors.textPrimary} />
         </Pressable>
         <Pressable
           onPress={() => zoomBy(2)}
           style={[styles.recenterBtn, { backgroundColor: colors.surface }]}
           hitSlop={8}
         >
-          <Ionicons name="remove" size={24} color={colors.textPrimary} />
+          <Icon name="minus" size={24} color={colors.textPrimary} />
         </Pressable>
         <Pressable
           onPress={locateMe}
           style={[styles.recenterBtn, { backgroundColor: colors.surface }]}
           hitSlop={8}
         >
-          <Ionicons name="locate" size={22} color={colors.accent} />
+          <Icon name="location" size={22} color={colors.accent} />
         </Pressable>
         <Pressable
           onPress={() => {
@@ -454,8 +454,8 @@ export default function GuideDetail() {
           style={[styles.recenterBtn, { backgroundColor: colors.surface }]}
           hitSlop={8}
         >
-          <Ionicons
-            name="scan-outline"
+          <Icon
+            name="viewfinder"
             size={22}
             color={visiblePlaces.length === 0 ? colors.textTertiary : colors.textPrimary}
           />
@@ -494,7 +494,7 @@ export default function GuideDetail() {
                 ]}
                 hitSlop={6}
               >
-                <Ionicons name="share-outline" size={20} color={colors.textPrimary} />
+                <Icon name="square.and.arrow.up" size={20} color={colors.textPrimary} />
               </Pressable>
             )}
             {canEdit && (
@@ -507,7 +507,7 @@ export default function GuideDetail() {
                 ]}
                 hitSlop={6}
               >
-                <Ionicons name="layers-outline" size={20} color={colors.textPrimary} />
+                <Icon name="square.stack.3d.up" size={20} color={colors.textPrimary} />
               </Pressable>
             )}
             {canEdit && (
@@ -519,7 +519,7 @@ export default function GuideDetail() {
                   pressed && { opacity: 0.8 },
                 ]}
               >
-                <Ionicons name="add" size={18} color="#fff" />
+                <Icon name="plus" size={18} color="#fff" />
                 <Text style={[typography.bodyMedium, { color: '#fff' }]}>Add</Text>
               </Pressable>
             )}
@@ -536,11 +536,7 @@ export default function GuideDetail() {
                 pressed && { opacity: 0.6 },
               ]}
             >
-              <Ionicons
-                name={allHidden ? 'eye-outline' : 'eye-off-outline'}
-                size={15}
-                color={colors.textSecondary}
-              />
+              <Icon name={allHidden ? 'eye' : 'eye.slash'} size={15} color={colors.textSecondary} />
               <Text style={[typography.caption, styles.toolLabel, { color: colors.textSecondary }]}>
                 {allHidden ? 'Show all' : 'Hide all'}
               </Text>
@@ -554,8 +550,8 @@ export default function GuideDetail() {
                 pressed && { opacity: 0.6 },
               ]}
             >
-              <Ionicons
-                name={allCollapsed ? 'chevron-down' : 'chevron-up'}
+              <Icon
+                name={allCollapsed ? 'chevron.down' : 'chevron.up'}
                 size={15}
                 color={colors.textSecondary}
               />
@@ -576,7 +572,7 @@ export default function GuideDetail() {
           }}
           ListEmptyComponent={
             <View style={[styles.sheetEmpty, { height: emptyStateHeight }]}>
-              <Ionicons name="location-outline" size={30} color={colors.textTertiary} />
+              <Icon name="mappin" size={30} color={colors.textTertiary} />
               <Text style={[typography.body, { color: colors.textSecondary, textAlign: 'center' }]}>
                 Tap “Add” to search for places and drop them on the map.
               </Text>
@@ -587,8 +583,8 @@ export default function GuideDetail() {
               onPress={() => collapseLayer(section.layer)}
               style={({ pressed }) => [styles.layerHeader, pressed && { opacity: 0.6 }]}
             >
-              <Ionicons
-                name={section.layer.collapsed ? 'chevron-forward' : 'chevron-down'}
+              <Icon
+                name={section.layer.collapsed ? 'chevron.right' : 'chevron.down'}
                 size={16}
                 color={colors.textTertiary}
               />
@@ -610,8 +606,8 @@ export default function GuideDetail() {
                 {section.count}
               </Text>
               <Pressable onPress={() => hideLayer(section.layer)} hitSlop={10}>
-                <Ionicons
-                  name={section.layer.hidden ? 'eye-off-outline' : 'eye-outline'}
+                <Icon
+                  name={section.layer.hidden ? 'eye.slash' : 'eye'}
                   size={20}
                   color={section.layer.hidden ? colors.textTertiary : colors.accent}
                 />

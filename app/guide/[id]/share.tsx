@@ -1,4 +1,4 @@
-import { Ionicons } from '@expo/vector-icons';
+import Icon from '@/components/Icon';
 import * as Linking from 'expo-linking';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useCallback, useEffect, useState } from 'react';
@@ -140,7 +140,7 @@ export default function ShareGuideScreen() {
       <View style={styles.header}>
         <Text style={[typography.title, { color: colors.textPrimary }]}>Share guide</Text>
         <Pressable onPress={() => router.back()} hitSlop={10}>
-          <Ionicons name="close" size={26} color={colors.textSecondary} />
+          <Icon name="xmark" size={26} color={colors.textSecondary} />
         </Pressable>
       </View>
 
@@ -184,7 +184,7 @@ export default function ShareGuideScreen() {
           <ActivityIndicator color="#fff" />
         ) : (
           <>
-            <Ionicons name="link" size={18} color="#fff" />
+            <Icon name="link" size={18} color="#fff" />
             <Text style={[typography.bodyMedium, { color: '#fff' }]}>
               {linkByRole[role] ? 'Share link' : 'Create & share link'}
             </Text>
@@ -225,7 +225,7 @@ export default function ShareGuideScreen() {
               <Text style={[typography.caption, { color: colors.textSecondary }]}>
                 {m.role === 'editor' ? 'Editor' : 'Viewer'}
               </Text>
-              <Ionicons name="chevron-down" size={14} color={colors.textTertiary} />
+              <Icon name="chevron.down" size={14} color={colors.textTertiary} />
             </Pressable>
           </View>
         ))

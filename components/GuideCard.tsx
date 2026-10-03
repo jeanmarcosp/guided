@@ -1,4 +1,4 @@
-import { Ionicons } from '@expo/vector-icons';
+import Icon from '@/components/Icon';
 import { StyleSheet, Text, View } from 'react-native';
 import AvatarCluster from '@/components/AvatarCluster';
 import type { Guide } from '@/lib/types';
@@ -32,7 +32,7 @@ export default function GuideCard({ guide }: Props) {
 
       {showMembers && <AvatarCluster members={members} />}
 
-      <Ionicons name="chevron-forward" size={20} color={colors.textTertiary} />
+      <Icon name="chevron.right" size={20} color={colors.textTertiary} />
     </View>
   );
 }

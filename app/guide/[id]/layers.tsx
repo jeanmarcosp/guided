@@ -1,4 +1,4 @@
-import { Ionicons } from '@expo/vector-icons';
+import Icon from '@/components/Icon';
 import * as Haptics from 'expo-haptics';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useEffect, useMemo, useState } from 'react';
@@ -134,7 +134,7 @@ export default function ManageLayers() {
               pressed && { opacity: 0.6 },
             ]}
           >
-            <Ionicons name="add" size={20} color={colors.accent} />
+            <Icon name="plus" size={20} color={colors.accent} />
             <Text style={[typography.bodyMedium, { color: colors.accent }]}>Add Layer</Text>
           </Pressable>
         }
@@ -174,7 +174,7 @@ function LayerRow({ layer, count, onEdit }: LayerRowProps) {
       ]}
     >
       <Pressable onLongPress={drag} delayLongPress={120} hitSlop={8} style={styles.grip}>
-        <Ionicons name="reorder-three" size={24} color={colors.textTertiary} />
+        <Icon name="line.3.horizontal" size={24} color={colors.textTertiary} />
       </Pressable>
 
       <View style={[styles.badge, { backgroundColor: layer.color + '22' }]}>
@@ -310,8 +310,8 @@ function LayerEditor({ layer, onSave, onDelete, onClose }: LayerEditorProps) {
                     ]
               }
             >
-              <Ionicons
-                name="color-palette-outline"
+              <Icon
+                name="paintpalette"
                 size={16}
                 color={isCustomColor ? contrastOn(color) : colors.textSecondary}
               />
@@ -337,7 +337,7 @@ function LayerEditor({ layer, onSave, onDelete, onClose }: LayerEditorProps) {
                 hitSlop={8}
                 style={({ pressed }) => [styles.wheelDone, pressed && { opacity: 0.6 }]}
               >
-                <Ionicons name="checkmark" size={18} color={colors.accent} />
+                <Icon name="checkmark" size={18} color={colors.accent} />
                 <Text style={[typography.bodyMedium, { color: colors.accent }]}>Done</Text>
               </Pressable>
             </View>
@@ -378,7 +378,7 @@ function LayerEditor({ layer, onSave, onDelete, onClose }: LayerEditorProps) {
             onPress={onDelete}
             style={({ pressed }) => [styles.deleteBtn, pressed && { opacity: 0.6 }]}
           >
-            <Ionicons name="trash-outline" size={18} color={colors.danger} />
+            <Icon name="trash" size={18} color={colors.danger} />
             <Text style={[typography.bodyMedium, { color: colors.danger }]}>Delete Layer</Text>
           </Pressable>
         </Animated.View>

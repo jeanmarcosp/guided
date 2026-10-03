@@ -1,4 +1,4 @@
-import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
+import Icon from '@/components/Icon';
 import * as Haptics from 'expo-haptics';
 import { useRouter } from 'expo-router';
 import { useMemo, useState, type ReactNode } from 'react';
@@ -140,9 +140,7 @@ export default function GuidesHome() {
   const swipeActions = (guide: Guide): SwipeAction[] => [
     {
       key: 'pin',
-      icon: (
-        <MaterialCommunityIcons name={guide.pinned ? 'pin-off' : 'pin'} size={20} color="#fff" />
-      ),
+      icon: <Icon name={guide.pinned ? 'pin.slash.fill' : 'pin.fill'} size={20} color="#fff" />,
       color: '#FF9500',
       onPress: () => {
         Haptics.selectionAsync();
@@ -151,7 +149,7 @@ export default function GuidesHome() {
     },
     {
       key: 'delete',
-      icon: <Ionicons name="trash" size={20} color="#fff" />,
+      icon: <Icon name="trash.fill" size={20} color="#fff" />,
       color: colors.danger,
       onPress: () => confirmDeleteGuide(guide),
     },
@@ -307,7 +305,7 @@ export default function GuidesHome() {
                 ]}
                 hitSlop={8}
               >
-                <Ionicons name="person-circle-outline" size={22} color={colors.textPrimary} />
+                <Icon name="person.circle" size={22} color={colors.textPrimary} />
               </Pressable>
               {canReorder && (
                 <Pressable
@@ -319,7 +317,7 @@ export default function GuidesHome() {
                   ]}
                   hitSlop={8}
                 >
-                  <Ionicons name="swap-vertical" size={20} color={colors.textPrimary} />
+                  <Icon name="arrow.up.arrow.down" size={20} color={colors.textPrimary} />
                 </Pressable>
               )}
               <Pressable
@@ -331,7 +329,7 @@ export default function GuidesHome() {
                 ]}
                 hitSlop={8}
               >
-                <Ionicons name="add" size={26} color="#fff" />
+                <Icon name="plus" size={26} color="#fff" />
               </Pressable>
             </>
           )}
@@ -354,7 +352,7 @@ export default function GuidesHome() {
               { backgroundColor: colors.surface, borderColor: colors.border },
             ]}
           >
-            <Ionicons name="map-outline" size={34} color={colors.textTertiary} />
+            <Icon name="map" size={34} color={colors.textTertiary} />
           </View>
           <Text style={[typography.heading, { color: colors.textPrimary }]}>No guides yet</Text>
           <Text style={[typography.body, styles.emptyText, { color: colors.textSecondary }]}>
@@ -368,7 +366,7 @@ export default function GuidesHome() {
               pressed && { opacity: 0.8 },
             ]}
           >
-            <Ionicons name="add" size={18} color="#fff" />
+            <Icon name="plus" size={18} color="#fff" />
             <Text style={[typography.bodyMedium, { color: '#fff' }]}>Create your first guide</Text>
           </Pressable>
         </View>
@@ -425,7 +423,7 @@ function GuideDragRow({ guide, onPress }: { guide: Guide; onPress: () => void })
   return (
     <View style={styles.rowWrap}>
       <Pressable onLongPress={drag} delayLongPress={150} hitSlop={8} style={styles.grip}>
-        <Ionicons name="reorder-three" size={24} color={colors.textTertiary} />
+        <Icon name="line.3.horizontal" size={24} color={colors.textTertiary} />
       </Pressable>
       <Pressable style={styles.rowCard} onPress={onPress}>
         <GuideCard guide={guide} />

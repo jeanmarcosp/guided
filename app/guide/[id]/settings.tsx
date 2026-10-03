@@ -1,4 +1,4 @@
-import { Ionicons } from '@expo/vector-icons';
+import Icon from '@/components/Icon';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useEffect, useState } from 'react';
 import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
@@ -31,7 +31,7 @@ export default function GuideSettingsScreen() {
           {guide?.name ?? 'Guide'}
         </Text>
         <Pressable onPress={close} hitSlop={10}>
-          <Ionicons name="close" size={26} color={colors.textSecondary} />
+          <Icon name="xmark" size={26} color={colors.textSecondary} />
         </Pressable>
       </View>
 
@@ -89,7 +89,7 @@ function GuideInfo({ guide }: { guide: Guide }) {
           style={[styles.card, { backgroundColor: colors.surface, borderColor: colors.border }]}
         >
           <View style={[styles.iconWrap, { backgroundColor: colors.surfaceAlt }]}>
-            <Ionicons name="calendar-outline" size={18} color={colors.textSecondary} />
+            <Icon name="calendar" size={18} color={colors.textSecondary} />
           </View>
           <Text style={[typography.body, styles.cardText, { color: colors.textPrimary }]}>
             {createdOn}

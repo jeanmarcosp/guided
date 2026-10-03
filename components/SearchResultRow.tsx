@@ -1,4 +1,4 @@
-import { Ionicons } from '@expo/vector-icons';
+import Icon from '@/components/Icon';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import type { SearchResult } from '@/lib/search';
 import { radius, spacing, typography, useColors } from '@/theme/tokens';
@@ -18,7 +18,7 @@ export default function SearchResultRow({ result, added, onPress }: Props) {
       style={({ pressed }) => [styles.row, pressed && !added && { opacity: 0.6 }]}
     >
       <View style={[styles.icon, { backgroundColor: colors.surfaceAlt }]}>
-        <Ionicons name="location-outline" size={18} color={colors.textSecondary} />
+        <Icon name="mappin" size={18} color={colors.textSecondary} />
       </View>
 
       <View style={styles.body}>
@@ -33,8 +33,8 @@ export default function SearchResultRow({ result, added, onPress }: Props) {
         )}
       </View>
 
-      <Ionicons
-        name={added ? 'checkmark-circle' : 'add-circle-outline'}
+      <Icon
+        name={added ? 'checkmark.circle.fill' : 'plus.circle'}
         size={24}
         color={added ? colors.accent : colors.textTertiary}
       />
