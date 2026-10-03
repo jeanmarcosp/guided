@@ -21,8 +21,10 @@ export type LayerRow = {
   guide_id: string;
   name: string;
   color: string;
-  /** SF Symbol name (legacy rows may still hold an emoji — normalized on read). */
-  icon: string;
+  /** Legacy emoji — still written by old clients during the transition. */
+  emoji: string;
+  /** SF Symbol name; null on rows written by old clients. */
+  icon: string | null;
   kind: string | null;
   hidden: boolean;
   collapsed: boolean;
@@ -52,7 +54,8 @@ export function layerRowToLayer(r: LayerRow): Layer {
     id: r.id,
     name: r.name,
     color: r.color,
-    icon: normalizeLayerIcon(r.icon),
+    // Old clients write only the emoji; derive the symbol from it then.
+    icon: normalizeLayerIcon(r.icon ?? r.emoji),
     kind: r.kind ?? undefined,
     // hidden/collapsed are per-user view state, not synced guide data. Ignore the
     // server value and default to visible/expanded; the current user's local

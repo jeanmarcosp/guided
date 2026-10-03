@@ -1,4 +1,5 @@
 import { supabase } from '@/lib/supabase';
+import { legacyEmojiForIcon } from '@/lib/layers';
 import { resolveProfiles } from '@/lib/api/shares';
 import type { Guide, GuideAccessMember, GuideRole, Layer, Place } from '@/lib/types';
 import { guideRowsToGuide, type GuideRow, type LayerRow, type PlaceRow } from '@/lib/api/mappers';
@@ -167,6 +168,8 @@ export async function upsertLayerRemote(
     name: layer.name,
     color: layer.color,
     icon: layer.icon,
+    // Transition: old clients still render the emoji column.
+    emoji: legacyEmojiForIcon(layer.icon),
     kind: layer.kind ?? null,
     sort_order: sortOrder,
   });
@@ -225,6 +228,8 @@ export async function pushGuide(guide: Guide, ownerId: string): Promise<void> {
     name: l.name,
     color: l.color,
     icon: l.icon,
+    // Transition: old clients still render the emoji column.
+    emoji: legacyEmojiForIcon(l.icon),
     kind: l.kind ?? null,
     sort_order: i,
   }));

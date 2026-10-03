@@ -97,6 +97,35 @@ export function normalizeLayerIcon(value: string | null | undefined): string {
   return EMOJI_TO_SYMBOL[value] ?? EMOJI_TO_SYMBOL[stripped] ?? FALLBACK_SYMBOL;
 }
 
+// Transition shim: old clients still render layers.emoji, so writes from this
+// build keep that column populated with the closest emoji. Dies with the
+// emoji column once every client is on SF Symbols.
+const SYMBOL_TO_EMOJI: Record<string, string> = {
+  mappin: '📍',
+  'fork.knife': '🍽️',
+  'cup.and.saucer.fill': '☕️',
+  'wineglass.fill': '🍸',
+  'birthday.cake.fill': '🍰',
+  'bag.fill': '🛍️',
+  'building.columns.fill': '🏛️',
+  'tree.fill': '🌳',
+  'bed.double.fill': '🛏️',
+  'paintpalette.fill': '🎨',
+  'music.note': '🎵',
+  'beach.umbrella.fill': '🏖️',
+  'mountain.2.fill': '⛰️',
+  'camera.fill': '📸',
+  'ticket.fill': '🎟️',
+  'book.fill': '📖',
+  'star.fill': '⭐️',
+  'heart.fill': '❤️',
+};
+
+/** The legacy emoji old clients should see for a symbol-iconed layer. */
+export function legacyEmojiForIcon(icon: string): string {
+  return SYMBOL_TO_EMOJI[icon] ?? '📍';
+}
+
 // Keyword rules, checked in order — first match wins. Café/bar precede food so
 // "coffee shop" and "wine bar" don't fall into shopping/food.
 const RULES: { kind: string; keywords: string[] }[] = [
