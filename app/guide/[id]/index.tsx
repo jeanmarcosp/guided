@@ -7,9 +7,8 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Alert, Pressable, StyleSheet, Text, useWindowDimensions, View } from 'react-native';
 import { MenuView, type MenuAction } from '@react-native-menu/menu';
 import Animated, { useAnimatedStyle, useSharedValue } from 'react-native-reanimated';
-import type MapView from 'react-native-maps';
-import { type Details, type Region } from 'react-native-maps';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import type { GuidedMapRef, Region } from '@/modules/guided-map';
 import GuideMap from '@/components/GuideMap';
 import PlaceRow from '@/components/PlaceRow';
 import { openPlaceInAppleMaps } from '@/lib/maps';
@@ -53,12 +52,10 @@ export default function GuideDetail() {
   const visited = useVisits((s) => s.visited);
   const toggleVisited = useVisits((s) => s.toggle);
 
-  const mapRef = useRef<MapView>(null);
+  const mapRef = useRef<GuidedMapRef>(null);
   const sheetRef = useRef<BottomSheet>(null);
   const mapReady = useRef(false);
   const prevCount = useRef(guide?.places.length ?? 0);
-  const programmaticMove = useRef(false); // a camera move we initiated
-  const suppressUntil = useRef(Date.now() + 1000); // swallow trailing settle events
   const [showSearchArea, setShowSearchArea] = useState(false);
   const [sheetHeaderHeight, setSheetHeaderHeight] = useState(0);
 
@@ -133,22 +130,22 @@ export default function GuideDetail() {
   const fitToPlaces = useCallback(
     (animated: boolean) => {
       if (!mapReady.current || visiblePlaces.length === 0) return;
-      programmaticMove.current = true;
       if (visiblePlaces.length === 1) {
-        mapRef.current?.animateToRegion(
+        mapRef.current?.setRegion(
           {
             latitude: visiblePlaces[0].latitude,
             longitude: visiblePlaces[0].longitude,
             latitudeDelta: 0.02,
             longitudeDelta: 0.02,
           },
-          animated ? 400 : 0,
+          animated,
         );
         return;
       }
       mapRef.current?.fitToCoordinates(
         visiblePlaces.map((p) => ({ latitude: p.latitude, longitude: p.longitude })),
-        { edgePadding: { top: 100, left: 60, right: 60, bottom: 360 }, animated },
+        { top: 100, left: 60, right: 60, bottom: 360 },
+        animated,
       );
     },
     [visiblePlaces],
@@ -185,51 +182,34 @@ export default function GuideDetail() {
       const { status } = await Location.requestForegroundPermissionsAsync();
       if (status !== 'granted') return;
       const pos = await Location.getCurrentPositionAsync({});
-      programmaticMove.current = true;
-      mapRef.current?.animateToRegion(
+      mapRef.current?.setRegion(
         {
           latitude: pos.coords.latitude,
           longitude: pos.coords.longitude,
           latitudeDelta: 0.02,
           longitudeDelta: 0.02,
         },
-        500,
+        true,
       );
     } catch {
       // Ignore — location is optional.
     }
   }
 
-  // Step the camera zoom. halve the altitude to zoom in, double it to zoom out
-  // (Apple Maps camera; the zoom fallback covers a Google provider).
+  // Step the camera zoom: halve the altitude to zoom in, double it to zoom out.
   async function zoomBy(factor: number) {
     Haptics.selectionAsync();
     try {
-      const cam = await mapRef.current?.getCamera();
-      if (!cam) return;
-      programmaticMove.current = true;
-      if (cam.altitude) {
-        mapRef.current?.animateCamera({ altitude: cam.altitude * factor }, { duration: 250 });
-      } else if (cam.zoom != null) {
-        mapRef.current?.animateCamera({ zoom: cam.zoom - Math.log2(factor) }, { duration: 250 });
-      }
+      await mapRef.current?.zoomBy(factor);
     } catch {
       // Ignore — map may not be ready yet.
     }
   }
 
-  // Show "Search this area" only for genuine user pans. Our own camera moves set
-  // `programmaticMove`; we clear it when that move completes and swallow the
-  // trailing settle event for a moment. (isGesture is unreliable on iOS.)
-  function handleRegionChange(_region: Region, _details: Details) {
-    const now = Date.now();
-    if (programmaticMove.current) {
-      programmaticMove.current = false;
-      suppressUntil.current = now + 800;
-      return;
-    }
-    if (now < suppressUntil.current) return;
-    setShowSearchArea(true);
+  // Show "Search this area" only for genuine user pans. The native map tells
+  // gestures and app-driven camera moves apart.
+  function handleRegionChange(_region: Region, isUserGesture: boolean) {
+    if (isUserGesture) setShowSearchArea(true);
   }
 
   function searchThisArea() {
@@ -285,15 +265,14 @@ export default function GuideDetail() {
       const pos = await Location.getLastKnownPositionAsync();
       const loc = pos ?? (await Location.getCurrentPositionAsync({}));
       if (!loc || cancelled) return;
-      programmaticMove.current = true;
-      mapRef.current?.animateToRegion(
+      mapRef.current?.setRegion(
         {
           latitude: loc.coords.latitude,
           longitude: loc.coords.longitude,
           latitudeDelta: 0.05,
           longitudeDelta: 0.05,
         },
-        500,
+        true,
       );
     })();
     return () => {
@@ -315,12 +294,8 @@ export default function GuideDetail() {
   function focusPlace(place: Place) {
     Haptics.selectionAsync();
     sheetRef.current?.snapToIndex(1); // medium — keep the list visible, reveal the map
-    programmaticMove.current = true;
     // Pan to the pin at the current zoom (gentle) rather than zooming in hard.
-    mapRef.current?.animateCamera(
-      { center: { latitude: place.latitude, longitude: place.longitude } },
-      { duration: 600 },
-    );
+    mapRef.current?.setCenter({ latitude: place.latitude, longitude: place.longitude }, true);
   }
 
   function confirmRemove(place: Place) {
@@ -347,9 +322,9 @@ export default function GuideDetail() {
     let lng: number | undefined;
     try {
       const cam = await mapRef.current?.getCamera();
-      if (cam?.center) {
-        lat = cam.center.latitude;
-        lng = cam.center.longitude;
+      if (cam) {
+        lat = cam.latitude;
+        lng = cam.longitude;
       }
     } catch {
       // Fall back to no map bias; the search screen will try device location.
@@ -389,13 +364,9 @@ export default function GuideDetail() {
         layerEmojis={layerEmojis}
         initialRegion={DEFAULT_REGION}
         onMarkerPress={focusPlace}
-        onAutoCameraMove={() => {
-          programmaticMove.current = true;
-        }}
-        onRegionChangeComplete={handleRegionChange}
+        onRegionChange={handleRegionChange}
         onMapReady={() => {
           mapReady.current = true;
-          programmaticMove.current = true;
           fitToPlaces(false);
         }}
       />
