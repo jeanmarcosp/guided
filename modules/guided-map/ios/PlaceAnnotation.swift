@@ -10,27 +10,28 @@ final class PlaceAnnotation: NSObject, MKAnnotation {
   let coordinate: CLLocationCoordinate2D
   /// Shown by the native callout.
   let title: String?
-  let emoji: String
+  /// SF Symbol name, drawn as the marker's glyph.
+  let icon: String
   let colorHex: String
   let layerId: String
 
   /// Everything the map renders or clusters on; a mismatch means replace.
   var contentKey: String {
-    "\(coordinate.latitude)|\(coordinate.longitude)|\(title ?? "")|\(emoji)|\(colorHex)|\(layerId)"
+    "\(coordinate.latitude)|\(coordinate.longitude)|\(title ?? "")|\(icon)|\(colorHex)|\(layerId)"
   }
 
   init(
     id: String,
     coordinate: CLLocationCoordinate2D,
     title: String,
-    emoji: String,
+    icon: String,
     colorHex: String,
     layerId: String
   ) {
     self.id = id
     self.coordinate = coordinate
     self.title = title
-    self.emoji = emoji
+    self.icon = icon
     self.colorHex = colorHex
     self.layerId = layerId
   }

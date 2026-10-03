@@ -12,7 +12,7 @@ import { openPlaceInAppleMaps } from '@/lib/maps';
 import type { Place } from '@/lib/types';
 
 const FALLBACK_COLOR = '#8E8E93';
-const FALLBACK_EMOJI = '📍';
+const FALLBACK_ICON = 'mappin';
 
 // Same padding as the screen's fitToPlaces, so the native cluster-tap zoom
 // frames members above the bottom sheet.
@@ -22,8 +22,8 @@ type Props = {
   places: Place[];
   /** layerId -> color, so pins match their layer. */
   layerColors: Record<string, string>;
-  /** layerId -> emoji, so a pin's category reads at a glance. */
-  layerEmojis: Record<string, string>;
+  /** layerId -> SF Symbol name, drawn as the pin's native glyph. */
+  layerIcons: Record<string, string>;
   initialRegion?: Region;
   onMarkerPress?: (place: Place) => void;
   onMapReady?: () => void;
@@ -40,7 +40,7 @@ type Props = {
  * and native events back into Place callbacks.
  */
 const GuideMap = forwardRef<GuidedMapRef, Props>(function GuideMap(
-  { places, layerColors, layerEmojis, initialRegion, onMarkerPress, onMapReady, onRegionChange },
+  { places, layerColors, layerIcons, initialRegion, onMarkerPress, onMapReady, onRegionChange },
   ref,
 ) {
   const annotations = useMemo<MapAnnotation[]>(
@@ -52,11 +52,11 @@ const GuideMap = forwardRef<GuidedMapRef, Props>(function GuideMap(
           latitude: place.latitude,
           longitude: place.longitude,
           title: place.name,
-          emoji: layerEmojis[place.layerId ?? ''] ?? FALLBACK_EMOJI,
+          icon: layerIcons[place.layerId ?? ''] ?? FALLBACK_ICON,
           color: layerColors[place.layerId ?? ''] ?? FALLBACK_COLOR,
           layerId: place.layerId ?? '',
         })),
-    [places, layerColors, layerEmojis],
+    [places, layerColors, layerIcons],
   );
 
   const placesById = useMemo(() => new Map(places.map((place) => [place.id, place])), [places]);

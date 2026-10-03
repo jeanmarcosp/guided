@@ -6,7 +6,7 @@ struct MapAnnotationRecord: Record {
   @Field var latitude: Double = 0
   @Field var longitude: Double = 0
   @Field var title: String = ""
-  @Field var emoji: String = "📍"
+  @Field var icon: String = "mappin"
   @Field var color: String = "#8E8E93"
   @Field var layerId: String = ""
 }

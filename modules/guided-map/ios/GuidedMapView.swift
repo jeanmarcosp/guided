@@ -81,7 +81,7 @@ class GuidedMapView: ExpoView, MKMapViewDelegate {
         id: record.id,
         coordinate: coordinate,
         title: record.title,
-        emoji: record.emoji,
+        icon: record.icon,
         colorHex: record.color,
         layerId: record.layerId
       )

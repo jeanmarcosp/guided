@@ -14,7 +14,8 @@ export type Layer = {
   id: string;
   name: string;
   color: string;
-  emoji: string;
+  /** SF Symbol name (e.g. "fork.knife") — rendered on pins and badges. */
+  icon: string;
   /** Taxonomy key used to auto-route new places; undefined for custom layers. */
   kind?: string;
   hidden?: boolean; // pins hidden on the map

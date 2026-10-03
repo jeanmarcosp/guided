@@ -2,7 +2,7 @@ import MapKit
 import UIKit
 
 /// Stock Apple Maps balloon marker for a single place: the layer's color via
-/// `markerTintColor`, the layer's emoji via `glyphText` — both native
+/// `markerTintColor`, the layer's SF Symbol via `glyphImage` — both native
 /// MKMarkerAnnotationView properties, so the look, selection animation, and
 /// callout are entirely MapKit's. `clusteringIdentifier` opts the pin into
 /// native clustering (MKClusterAnnotation, rendered by ClusterMarkerView).
@@ -37,6 +37,8 @@ final class PlacePinView: MKMarkerAnnotationView {
     guard let place = annotation as? PlaceAnnotation else { return }
     clusteringIdentifier = "place"
     markerTintColor = UIColor(hexString: place.colorHex)
-    glyphText = place.emoji
+    // An unknown symbol name yields nil, and MapKit falls back to its default
+    // pin glyph — never a blank balloon.
+    glyphImage = UIImage(systemName: place.icon)
   }
 }

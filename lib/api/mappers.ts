@@ -1,3 +1,4 @@
+import { normalizeLayerIcon } from '@/lib/layers';
 import type { Guide, GuideAccessMember, GuideRole, Layer, Place } from '@/lib/types';
 
 // ---------------------------------------------------------------------------
@@ -20,7 +21,8 @@ export type LayerRow = {
   guide_id: string;
   name: string;
   color: string;
-  emoji: string;
+  /** SF Symbol name (legacy rows may still hold an emoji — normalized on read). */
+  icon: string;
   kind: string | null;
   hidden: boolean;
   collapsed: boolean;
@@ -50,7 +52,7 @@ export function layerRowToLayer(r: LayerRow): Layer {
     id: r.id,
     name: r.name,
     color: r.color,
-    emoji: r.emoji,
+    icon: normalizeLayerIcon(r.icon),
     kind: r.kind ?? undefined,
     // hidden/collapsed are per-user view state, not synced guide data. Ignore the
     // server value and default to visible/expanded; the current user's local

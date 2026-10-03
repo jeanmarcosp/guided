@@ -166,7 +166,7 @@ export async function upsertLayerRemote(
     guide_id: guideId,
     name: layer.name,
     color: layer.color,
-    emoji: layer.emoji,
+    icon: layer.icon,
     kind: layer.kind ?? null,
     sort_order: sortOrder,
   });
@@ -224,7 +224,7 @@ export async function pushGuide(guide: Guide, ownerId: string): Promise<void> {
     guide_id: guide.id,
     name: l.name,
     color: l.color,
-    emoji: l.emoji,
+    icon: l.icon,
     kind: l.kind ?? null,
     sort_order: i,
   }));

@@ -15,7 +15,6 @@ import {
   TextInput,
   View,
 } from 'react-native';
-import EmojiPicker, { type EmojiType } from 'rn-emoji-keyboard';
 import Animated, { SlideInDown } from 'react-native-reanimated';
 import ReorderableList, {
   useReorderableDrag,
@@ -23,7 +22,8 @@ import ReorderableList, {
 } from 'react-native-reorderable-list';
 import ColorPicker from 'react-native-wheel-color-picker';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { LAYER_COLORS, LAYER_EMOJIS } from '@/lib/layers';
+import LayerIcon from '@/components/LayerIcon';
+import { FALLBACK_SYMBOL, LAYER_COLORS, LAYER_SYMBOLS } from '@/lib/layers';
 import type { Layer } from '@/lib/types';
 import { useGuides } from '@/store/guides';
 import { radius, spacing, typography, useColors } from '@/theme/tokens';
@@ -178,7 +178,7 @@ function LayerRow({ layer, count, onEdit }: LayerRowProps) {
       </Pressable>
 
       <View style={[styles.badge, { backgroundColor: layer.color + '22' }]}>
-        <Text style={styles.badgeEmoji}>{layer.emoji}</Text>
+        <LayerIcon name={layer.icon} size={20} tintColor={layer.color} />
       </View>
 
       <View style={styles.rowBody}>
@@ -206,7 +206,7 @@ function LayerRow({ layer, count, onEdit }: LayerRowProps) {
 
 type LayerEditorProps = {
   layer: Layer | null;
-  onSave: (patch: { name: string; color: string; emoji: string }) => void;
+  onSave: (patch: { name: string; color: string; icon: string }) => void;
   onDelete: () => void;
   onClose: () => void;
 };
@@ -217,37 +217,27 @@ function LayerEditor({ layer, onSave, onDelete, onClose }: LayerEditorProps) {
 
   const [name, setName] = useState('');
   const [color, setColor] = useState(LAYER_COLORS[0]);
-  const [emoji, setEmoji] = useState('📍');
+  const [icon, setIcon] = useState(FALLBACK_SYMBOL);
   const [showWheel, setShowWheel] = useState(false);
-  const [showEmojiPicker, setShowEmojiPicker] = useState(false);
 
   // Load the draft whenever a different layer opens.
   useEffect(() => {
     if (layer) {
       setName(layer.name);
       setColor(layer.color);
-      setEmoji(layer.emoji);
+      setIcon(layer.icon);
       setShowWheel(false);
     }
   }, [layer?.id]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  function handleCustomEmoji(picked: EmojiType) {
-    setEmoji(picked.emoji);
-    setShowEmojiPicker(false);
-  }
-
   function done() {
-    if (layer) onSave({ name, color, emoji });
+    if (layer) onSave({ name, color, icon });
     onClose();
   }
 
   // True when the current color isn't one of the presets → the custom swatch
   // shows that color (selected, like a preset) instead of the palette icon.
   const isCustomColor = !LAYER_COLORS.includes(color);
-
-  // True when the picked emoji isn't one of the presets → show it as an extra
-  // selected chip in the row (outlined in the layer color, like the presets).
-  const isCustomEmoji = !!emoji && !LAYER_EMOJIS.includes(emoji);
 
   return (
     <Modal visible={!!layer} transparent animationType="fade" onRequestClose={done}>
@@ -270,7 +260,7 @@ function LayerEditor({ layer, onSave, onDelete, onClose }: LayerEditorProps) {
           {/* Preview + name */}
           <View style={styles.previewRow}>
             <View style={[styles.previewBadge, { backgroundColor: color + '22' }]}>
-              <Text style={styles.previewEmoji}>{emoji}</Text>
+              <LayerIcon name={icon} size={26} tintColor={color} />
             </View>
             <TextInput
               value={name}
@@ -359,79 +349,30 @@ function LayerEditor({ layer, onSave, onDelete, onClose }: LayerEditorProps) {
           <ScrollView
             horizontal
             showsHorizontalScrollIndicator={false}
-            contentContainerStyle={styles.emojiRow}
+            contentContainerStyle={styles.iconRow}
           >
-            <Pressable
-              onPress={() => {
-                Keyboard.dismiss();
-                setShowEmojiPicker(true);
-              }}
-              style={[styles.emojiBtn, styles.customEmojiBtn, { borderColor: colors.border }]}
-            >
-              <Ionicons name="add" size={20} color={colors.textSecondary} />
-            </Pressable>
-            {isCustomEmoji && (
+            {LAYER_SYMBOLS.map((symbol) => (
               <Pressable
-                onPress={() => {
-                  Keyboard.dismiss();
-                  setShowEmojiPicker(true);
-                }}
+                key={symbol}
+                onPress={() => setIcon(symbol)}
                 style={[
-                  styles.emojiBtn,
-                  { backgroundColor: color + '33', borderColor: color, borderWidth: 2 },
-                ]}
-              >
-                <Text style={styles.emojiText}>{emoji}</Text>
-              </Pressable>
-            )}
-            {LAYER_EMOJIS.map((e) => (
-              <Pressable
-                key={e}
-                onPress={() => setEmoji(e)}
-                style={[
-                  styles.emojiBtn,
+                  styles.iconBtn,
                   { backgroundColor: colors.surfaceAlt },
-                  emoji === e && {
+                  icon === symbol && {
                     backgroundColor: color + '33',
                     borderColor: color,
                     borderWidth: 2,
                   },
                 ]}
               >
-                <Text style={styles.emojiText}>{e}</Text>
+                <LayerIcon
+                  name={symbol}
+                  size={20}
+                  tintColor={icon === symbol ? color : colors.textSecondary}
+                />
               </Pressable>
             ))}
           </ScrollView>
-          {/* In-app emoji picker — opens straight to emojis so the user can
-              pick ANY emoji without hunting for the 🌐 key. */}
-          <EmojiPicker
-            open={showEmojiPicker}
-            onClose={() => setShowEmojiPicker(false)}
-            onEmojiSelected={handleCustomEmoji}
-            enableSearchBar
-            theme={{
-              backdrop: '#00000080',
-              knob: colors.handle,
-              container: colors.surface,
-              header: colors.textSecondary,
-              skinTonesContainer: colors.surfaceAlt,
-              category: {
-                icon: colors.textSecondary,
-                iconActive: contrastOn(colors.accent),
-                container: colors.surfaceAlt,
-                containerActive: colors.accent,
-              },
-              search: {
-                text: colors.textPrimary,
-                placeholder: colors.textTertiary,
-                icon: colors.textSecondary,
-                background: colors.surfaceAlt,
-              },
-              emoji: {
-                selected: colors.surfaceAlt,
-              },
-            }}
-          />
 
           <Pressable
             onPress={onDelete}
@@ -475,7 +416,6 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  badgeEmoji: { fontSize: 20 },
   rowBody: { flex: 1, gap: 1 },
   editBtn: {
     paddingHorizontal: spacing.md,
@@ -512,7 +452,6 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  previewEmoji: { fontSize: 26 },
   nameInput: {
     flex: 1,
     height: 46,
@@ -544,16 +483,14 @@ const styles = StyleSheet.create({
     paddingVertical: spacing.xs,
     paddingHorizontal: spacing.sm,
   },
-  emojiRow: { gap: spacing.sm, paddingVertical: 2 },
-  emojiBtn: {
+  iconRow: { gap: spacing.sm, paddingVertical: 2 },
+  iconBtn: {
     width: 44,
     height: 44,
     borderRadius: radius.sm,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  emojiText: { fontSize: 22 },
-  customEmojiBtn: { borderWidth: StyleSheet.hairlineWidth, borderStyle: 'dashed' },
   deleteBtn: {
     flexDirection: 'row',
     alignItems: 'center',

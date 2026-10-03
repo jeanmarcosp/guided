@@ -16,8 +16,8 @@ export type MapAnnotation = {
   longitude: number;
   /** Shown by the native callout. */
   title: string;
-  /** Drawn inside the pin head. */
-  emoji: string;
+  /** SF Symbol name, drawn as the marker's native glyph. */
+  icon: string;
   /** Pin/bubble fill, "#RRGGBB". */
   color: string;
   /** Groups members for the cluster bubble's dominant-layer tint. */

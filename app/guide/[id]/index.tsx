@@ -10,6 +10,7 @@ import Animated, { useAnimatedStyle, useSharedValue } from 'react-native-reanima
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import type { GuidedMapRef, Region } from '@/modules/guided-map';
 import GuideMap from '@/components/GuideMap';
+import LayerIcon from '@/components/LayerIcon';
 import PlaceRow from '@/components/PlaceRow';
 import { openPlaceInAppleMaps } from '@/lib/maps';
 import type { Layer, Place } from '@/lib/types';
@@ -94,10 +95,7 @@ export default function GuideDetail() {
     [layers],
   );
 
-  const layerEmojis = useMemo(
-    () => Object.fromEntries(layers.map((l) => [l.id, l.emoji])),
-    [layers],
-  );
+  const layerIcons = useMemo(() => Object.fromEntries(layers.map((l) => [l.id, l.icon])), [layers]);
 
   // Places whose layer isn't hidden — what the map actually shows.
   const visiblePlaces = useMemo(() => {
@@ -229,7 +227,13 @@ export default function GuideDetail() {
       actions.push({
         id: 'move',
         title: 'Move to Layer',
-        subactions: targets.map((l) => ({ id: `move:${l.id}`, title: `${l.emoji}  ${l.name}` })),
+        // `image` takes an SF Symbol name on iOS — native icon in the menu row.
+        subactions: targets.map((l) => ({
+          id: `move:${l.id}`,
+          title: l.name,
+          image: l.icon,
+          imageColor: l.color,
+        })),
       });
     }
     actions.push({
@@ -361,7 +365,7 @@ export default function GuideDetail() {
         ref={mapRef}
         places={visiblePlaces}
         layerColors={layerColors}
-        layerEmojis={layerEmojis}
+        layerIcons={layerIcons}
         initialRegion={DEFAULT_REGION}
         onMarkerPress={focusPlace}
         onRegionChange={handleRegionChange}
@@ -589,7 +593,7 @@ export default function GuideDetail() {
                 color={colors.textTertiary}
               />
               <View style={[styles.layerBadge, { backgroundColor: section.layer.color + '22' }]}>
-                <Text style={styles.layerEmoji}>{section.layer.emoji}</Text>
+                <LayerIcon name={section.layer.icon} size={15} tintColor={section.layer.color} />
               </View>
               <Text
                 numberOfLines={1}
@@ -770,5 +774,4 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  layerEmoji: { fontSize: 15 },
 });
