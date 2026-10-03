@@ -46,6 +46,55 @@ export async function searchApple(
   }));
 }
 
+/** A type-ahead suggestion from MKLocalSearchCompleter — no coordinates yet. */
+export type AppleCompletion = {
+  /** Index into the native module's latest completion set (for resolving). */
+  index: number;
+  title: string;
+  subtitle: string;
+  /** UTF-16 ranges of `title` matching the typed fragment — for bolding. */
+  titleRanges: { location: number; length: number }[];
+};
+
+/**
+ * Live suggestions for a partially typed query — the same engine behind
+ * Apple Maps' own search field. Much cheaper than a full search; the native
+ * completer self-throttles and supersedes stale fragments.
+ */
+export async function getAppleCompletions(
+  fragment: string,
+  near?: { latitude: number; longitude: number },
+): Promise<AppleCompletion[]> {
+  if (!AppleSearch) throw new Error('AppleSearch native module is unavailable');
+  return AppleSearch.getCompletions(fragment, near?.latitude ?? null, near?.longitude ?? null);
+}
+
+/**
+ * Resolve a tapped completion to a concrete place (coordinates, address,
+ * category). Falls back to a plain text search if the native completion list
+ * changed under the tap.
+ */
+export async function resolveAppleCompletion(
+  completion: AppleCompletion,
+  near?: { latitude: number; longitude: number },
+): Promise<SearchResult> {
+  if (!AppleSearch) throw new Error('AppleSearch native module is unavailable');
+  try {
+    const raw: RawResult = await AppleSearch.resolveCompletion(completion.index, completion.title);
+    return {
+      name: raw.name,
+      latitude: raw.latitude,
+      longitude: raw.longitude,
+      address: raw.address,
+      category: prettifyCategory(raw.category),
+    };
+  } catch {
+    const results = await searchApple(completion.title, near);
+    if (results.length === 0) throw new Error('No match for suggestion');
+    return results[0];
+  }
+}
+
 /**
  * Open the real Apple POI (place card with photos/reviews) in Apple Maps,
  * resolved by name near the given coordinate.

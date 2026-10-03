@@ -1,8 +1,8 @@
-import { Ionicons } from '@expo/vector-icons';
+import Icon from '@/components/Icon';
 import * as Haptics from 'expo-haptics';
 import * as Location from 'expo-location';
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   FlatList,
@@ -15,11 +15,20 @@ import {
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import SearchResultRow from '@/components/SearchResultRow';
+import SearchSuggestionRow from '@/components/SearchSuggestionRow';
 import { searchPlaces, type SearchResult } from '@/lib/search';
+import {
+  getAppleCompletions,
+  isAppleSearchAvailable,
+  resolveAppleCompletion,
+  type AppleCompletion,
+} from '@/modules/apple-search';
 import { useGuides } from '@/store/guides';
 import { radius, spacing, typography, useColors } from '@/theme/tokens';
 
 const coordKey = (lat: number, lon: number) => `${lat.toFixed(5)},${lon.toFixed(5)}`;
+
+const completionKey = (c: AppleCompletion) => `${c.title}|${c.subtitle}`;
 
 export default function SearchScreen() {
   const colors = useColors();
@@ -42,6 +51,15 @@ export default function SearchScreen() {
   const [results, setResults] = useState<SearchResult[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  // Apple type-ahead: live MKLocalSearchCompleter suggestions while typing;
+  // a full search runs only on submit (or on the trailing "Search for" row).
+  const [completions, setCompletions] = useState<AppleCompletion[]>([]);
+  const [mode, setMode] = useState<'suggest' | 'results'>(
+    isAppleSearchAvailable ? 'suggest' : 'results',
+  );
+  const [resolvingKey, setResolvingKey] = useState<string | null>(null);
+  const [addedSuggestions, setAddedSuggestions] = useState<Set<string>>(new Set());
+  const completionReq = useRef(0);
   const [near, setNear] = useState<{ latitude: number; longitude: number } | undefined>(() =>
     lat && lng ? { latitude: parseFloat(lat), longitude: parseFloat(lng) } : undefined,
   );
@@ -68,8 +86,38 @@ export default function SearchScreen() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // Debounced search with cancellation of in-flight requests.
+  // Apple path: live type-ahead suggestions (MKLocalSearchCompleter) — fast
+  // and cheap per keystroke; the completer self-throttles natively.
   useEffect(() => {
+    if (!isAppleSearchAvailable) return;
+    const q = query.trim();
+    setMode('suggest');
+    if (q.length < 2) {
+      setCompletions([]);
+      setLoading(false);
+      setError(null);
+      return;
+    }
+    setLoading(true);
+    setError(null);
+    const reqId = ++completionReq.current;
+    const t = setTimeout(async () => {
+      try {
+        const res = await getAppleCompletions(q, near);
+        // Superseded fragments resolve empty — only the latest request lands.
+        if (completionReq.current === reqId) setCompletions(res);
+      } catch {
+        if (completionReq.current === reqId) setCompletions([]);
+      } finally {
+        if (completionReq.current === reqId) setLoading(false);
+      }
+    }, 150);
+    return () => clearTimeout(t);
+  }, [query, near]);
+
+  // Fallback providers (no native module): debounced full search as before.
+  useEffect(() => {
+    if (isAppleSearchAvailable) return;
     const q = query.trim();
     if (q.length < 2) {
       setResults([]);
@@ -97,11 +145,44 @@ export default function SearchScreen() {
     };
   }, [query, near]);
 
+  // Full search on submit / "Search for" row (Apple path).
+  async function runFullSearch() {
+    const q = query.trim();
+    if (q.length < 2) return;
+    Keyboard.dismiss();
+    setMode('results');
+    setLoading(true);
+    setError(null);
+    try {
+      setResults(await searchPlaces(q, near));
+    } catch {
+      setError('Could not load results. Check your connection.');
+    } finally {
+      setLoading(false);
+    }
+  }
+
   function handleAdd(result: SearchResult) {
     if (!guide) return;
     if (addedKeys.has(coordKey(result.latitude, result.longitude))) return;
     Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
     addPlaceToGuide(guide.id, result);
+  }
+
+  // Tapping a suggestion: resolve it to coordinates, then add like any result.
+  async function handleAddCompletion(completion: AppleCompletion) {
+    const key = completionKey(completion);
+    if (addedSuggestions.has(key) || resolvingKey) return;
+    setResolvingKey(key);
+    try {
+      const result = await resolveAppleCompletion(completion, near);
+      handleAdd(result);
+      setAddedSuggestions((prev) => new Set(prev).add(key));
+    } catch {
+      setError('Could not load that place. Try searching instead.');
+    } finally {
+      setResolvingKey(null);
+    }
   }
 
   return (
@@ -113,7 +194,7 @@ export default function SearchScreen() {
     >
       <View style={styles.header}>
         <View style={[styles.searchBox, { backgroundColor: colors.surfaceAlt }]}>
-          <Ionicons name="search" size={18} color={colors.textTertiary} />
+          <Icon name="magnifyingglass" size={18} color={colors.textTertiary} />
           <TextInput
             value={query}
             onChangeText={setQuery}
@@ -122,11 +203,12 @@ export default function SearchScreen() {
             autoFocus
             autoCorrect={false}
             returnKeyType="search"
+            onSubmitEditing={runFullSearch}
             style={[styles.input, { color: colors.textPrimary }]}
           />
           {query.length > 0 && (
             <Pressable onPress={() => setQuery('')} hitSlop={8}>
-              <Ionicons name="close-circle" size={18} color={colors.textTertiary} />
+              <Icon name="xmark.circle.fill" size={18} color={colors.textTertiary} />
             </Pressable>
           )}
         </View>
@@ -141,7 +223,15 @@ export default function SearchScreen() {
         </Pressable>
       </View>
 
-      {loading && results.length === 0 ? (
+      {query.trim().length < 2 ? (
+        <View style={styles.center}>
+          <Icon name="magnifyingglass" size={28} color={colors.textTertiary} />
+          <Text style={[typography.body, { color: colors.textSecondary, textAlign: 'center' }]}>
+            Results are near the map&apos;s current area. Pan the map to another city to search
+            there.
+          </Text>
+        </View>
+      ) : loading && (mode === 'suggest' ? completions : results).length === 0 ? (
         <View style={styles.center}>
           <ActivityIndicator color={colors.textSecondary} />
         </View>
@@ -151,14 +241,54 @@ export default function SearchScreen() {
             {error}
           </Text>
         </View>
-      ) : query.trim().length < 2 ? (
-        <View style={styles.center}>
-          <Ionicons name="search" size={28} color={colors.textTertiary} />
-          <Text style={[typography.body, { color: colors.textSecondary, textAlign: 'center' }]}>
-            Results are near the map&apos;s current area. Pan the map to another city to search
-            there.
-          </Text>
-        </View>
+      ) : mode === 'suggest' && isAppleSearchAvailable ? (
+        <FlatList
+          data={completions}
+          keyExtractor={completionKey}
+          keyboardShouldPersistTaps="handled"
+          contentContainerStyle={{
+            paddingHorizontal: spacing.lg,
+            paddingBottom: insets.bottom + spacing.xxl,
+          }}
+          ItemSeparatorComponent={() => (
+            <View style={[styles.sep, { backgroundColor: colors.border }]} />
+          )}
+          renderItem={({ item }) => (
+            <SearchSuggestionRow
+              completion={item}
+              added={addedSuggestions.has(completionKey(item))}
+              resolving={resolvingKey === completionKey(item)}
+              onPress={() => handleAddCompletion(item)}
+            />
+          )}
+          ListEmptyComponent={
+            <Text
+              style={[
+                typography.body,
+                styles.emptySuggest,
+                { color: colors.textSecondary, textAlign: 'center' },
+              ]}
+            >
+              No suggestions for “{query.trim()}”.
+            </Text>
+          }
+          ListFooterComponent={
+            <Pressable
+              onPress={runFullSearch}
+              style={({ pressed }) => [styles.searchForRow, pressed && { opacity: 0.6 }]}
+            >
+              <View style={[styles.searchForIcon, { backgroundColor: colors.surfaceAlt }]}>
+                <Icon name="magnifyingglass" size={18} color={colors.accent} />
+              </View>
+              <Text
+                numberOfLines={1}
+                style={[typography.bodyMedium, { color: colors.accent, flexShrink: 1 }]}
+              >
+                Search for “{query.trim()}”
+              </Text>
+            </Pressable>
+          }
+        />
       ) : results.length === 0 ? (
         <View style={styles.center}>
           <Text style={[typography.body, { color: colors.textSecondary, textAlign: 'center' }]}>
@@ -217,4 +347,18 @@ const styles = StyleSheet.create({
     paddingHorizontal: spacing.xxl,
   },
   sep: { height: StyleSheet.hairlineWidth, marginLeft: 50 },
+  emptySuggest: { paddingVertical: spacing.xl },
+  searchForRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.md,
+    paddingVertical: spacing.md,
+  },
+  searchForIcon: {
+    width: 38,
+    height: 38,
+    borderRadius: radius.pill,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
 });
