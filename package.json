@@ -6,7 +6,6 @@
   "dependencies": {
     "@gorhom/bottom-sheet": "^5.2.14",
     "@react-native-async-storage/async-storage": "2.2.0",
-    "@react-native-menu/menu": "^2.0.0",
     "@supabase/supabase-js": "^2.112.3",
     "@tanstack/react-query": "^5.101.4",
     "aes-js": "^3.1.2",

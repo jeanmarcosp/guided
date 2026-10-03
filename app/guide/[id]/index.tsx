@@ -4,8 +4,15 @@ import * as Haptics from 'expo-haptics';
 import * as Location from 'expo-location';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Alert, Pressable, StyleSheet, Text, useWindowDimensions, View } from 'react-native';
-import { MenuView, type MenuAction } from '@react-native-menu/menu';
+import {
+  ActionSheetIOS,
+  Alert,
+  Pressable,
+  StyleSheet,
+  Text,
+  useWindowDimensions,
+  View,
+} from 'react-native';
 import Animated, { useAnimatedStyle, useSharedValue } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import type { GuidedMapRef, Region } from '@/modules/guided-map';
@@ -215,48 +222,63 @@ export default function GuideDetail() {
     openSearch();
   }
 
-  // Native (liquid-glass) long-press menu for a place: open in Maps, move layer, remove.
-  function placeMenuActions(place: Place): MenuAction[] {
-    const actions: MenuAction[] = [{ id: 'open', title: 'Open in Apple Maps' }];
-    // "Visited" is a personal mark, so every role (viewers included) gets it.
-    // `state` renders the native checkmark when the place is already visited.
-    actions.push({ id: 'visited', title: 'Visited', state: visited[place.id] ? 'on' : 'off' });
-    if (!canEdit) return actions; // viewers can open + mark visited, not modify
-    const targets = layers.filter((l) => l.id !== place.layerId);
-    if (targets.length > 0) {
-      actions.push({
-        id: 'move',
-        title: 'Move to Layer',
-        // `image` takes an SF Symbol name on iOS — native icon in the menu row.
-        subactions: targets.map((l) => ({
-          id: `move:${l.id}`,
-          title: l.name,
-          image: l.icon,
-          imageColor: l.color,
-        })),
+  // Native long-press menu for a place (ActionSheetIOS). NOT @react-native-menu's
+  // MenuView: on the New Architecture its wrapper swallows child taps, which
+  // silently killed row presses (long-press worked, tap did nothing).
+  function showPlaceMenu(place: Place) {
+    if (!guide) return;
+    const entries: { label: string; destructive?: boolean; action: () => void }[] = [
+      { label: 'Open in Apple Maps', action: () => openPlaceInAppleMaps(place) },
+      {
+        // "Visited" is a personal mark, so every role (viewers included) gets it.
+        label: visited[place.id] ? 'Unmark Visited' : 'Mark Visited',
+        action: () => {
+          Haptics.selectionAsync();
+          toggleVisited(place.id);
+        },
+      },
+    ];
+    if (canEdit) {
+      const targets = layers.filter((l) => l.id !== place.layerId);
+      if (targets.length > 0) {
+        entries.push({
+          label: 'Move to Layer…',
+          action: () => showMoveToLayerMenu(place, targets),
+        });
+      }
+      entries.push({
+        label: 'Remove from Guide',
+        destructive: true,
+        action: () => confirmRemove(place),
       });
     }
-    actions.push({
-      id: 'remove',
-      title: 'Remove from Guide',
-      attributes: { destructive: true },
-    });
-    return actions;
+    const destructiveIndex = entries.findIndex((e) => e.destructive);
+    ActionSheetIOS.showActionSheetWithOptions(
+      {
+        title: place.name,
+        options: [...entries.map((e) => e.label), 'Cancel'],
+        cancelButtonIndex: entries.length,
+        destructiveButtonIndex: destructiveIndex >= 0 ? destructiveIndex : undefined,
+      },
+      (index) => entries[index]?.action(),
+    );
   }
 
-  function handlePlaceMenuAction(place: Place, event: string) {
-    if (!guide) return;
-    if (event === 'open') {
-      openPlaceInAppleMaps(place);
-    } else if (event === 'visited') {
-      Haptics.selectionAsync();
-      toggleVisited(place.id);
-    } else if (event.startsWith('move:')) {
-      Haptics.selectionAsync();
-      movePlaceToLayer(guide.id, place.id, event.slice('move:'.length));
-    } else if (event === 'remove') {
-      confirmRemove(place);
-    }
+  function showMoveToLayerMenu(place: Place, targets: Layer[]) {
+    ActionSheetIOS.showActionSheetWithOptions(
+      {
+        title: `Move “${place.name}” to`,
+        options: [...targets.map((l) => l.name), 'Cancel'],
+        cancelButtonIndex: targets.length,
+      },
+      (index) => {
+        const target = targets[index];
+        if (target && guide) {
+          Haptics.selectionAsync();
+          movePlaceToLayer(guide.id, place.id, target.id);
+        }
+      },
+    );
   }
 
   // Center on the user when a fresh guide has no places yet.
@@ -300,6 +322,22 @@ export default function GuideDetail() {
     sheetRef.current?.snapToIndex(1); // medium — keep the list visible, reveal the map
     // Pan to the pin at the current zoom (gentle) rather than zooming in hard.
     mapRef.current?.setCenter({ latitude: place.latitude, longitude: place.longitude }, true);
+  }
+
+  // List row tap: pan AND zoom to street level, so the pin stands alone on the
+  // map (far enough in to split out of any cluster). No selection — just show it.
+  function goToPlace(place: Place) {
+    Haptics.selectionAsync();
+    sheetRef.current?.snapToIndex(1);
+    mapRef.current?.setRegion(
+      {
+        latitude: place.latitude,
+        longitude: place.longitude,
+        latitudeDelta: 0.005,
+        longitudeDelta: 0.005,
+      },
+      true,
+    );
   }
 
   function confirmRemove(place: Place) {
@@ -615,21 +653,15 @@ export default function GuideDetail() {
             </Pressable>
           )}
           renderItem={({ item, section }) => (
-            <MenuView
-              title={item.name}
-              shouldOpenOnLongPress
-              actions={placeMenuActions(item)}
-              onPressAction={({ nativeEvent }) => handlePlaceMenuAction(item, nativeEvent.event)}
-            >
-              <PlaceRow
-                place={item}
-                color={section.layer.color}
-                onPress={() => focusPlace(item)}
-                onDelete={() => removePlaceFromGuide(guide.id, item.id)}
-                readOnly={!canEdit}
-                visited={!!visited[item.id]}
-              />
-            </MenuView>
+            <PlaceRow
+              place={item}
+              color={section.layer.color}
+              onPress={() => goToPlace(item)}
+              onLongPress={() => showPlaceMenu(item)}
+              onDelete={() => removePlaceFromGuide(guide.id, item.id)}
+              readOnly={!canEdit}
+              visited={!!visited[item.id]}
+            />
           )}
         />
       </BottomSheet>

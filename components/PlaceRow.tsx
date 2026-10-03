@@ -1,7 +1,10 @@
 import Icon from '@/components/Icon';
 import { useCallback, useEffect } from 'react';
-import { Dimensions, Pressable, StyleSheet, Text, View } from 'react-native';
-import { Gesture, GestureDetector } from 'react-native-gesture-handler';
+import { Dimensions, StyleSheet, Text, View } from 'react-native';
+// RNGH's Pressable, not RN's: inside this gesture-handler hierarchy (pan +
+// the sheet's scrollable) with a Reanimated transform, RN Pressable's touches
+// get cancelled and onPress never fires (see RNGH #4496).
+import { Gesture, GestureDetector, Pressable } from 'react-native-gesture-handler';
 import Reanimated, {
   runOnJS,
   useAnimatedStyle,
