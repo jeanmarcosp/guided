@@ -13,9 +13,15 @@ import {
   useWindowDimensions,
   View,
 } from 'react-native';
-import Animated, { useAnimatedStyle, useSharedValue } from 'react-native-reanimated';
+import Animated, {
+  Extrapolation,
+  interpolate,
+  useAnimatedStyle,
+  useSharedValue,
+} from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import type { GuidedMapRef, Region } from '@/modules/guided-map';
+import GlassSurface from '@/components/GlassSurface';
 import GuideMap from '@/components/GuideMap';
 import LayerIcon from '@/components/LayerIcon';
 import PlaceRow from '@/components/PlaceRow';
@@ -33,7 +39,13 @@ const DEFAULT_REGION: Region = {
 };
 
 const RECENTER_SIZE = 44;
-const CONTROLS_HEIGHT = RECENTER_SIZE * 4 + 8 * 3; // zoom in/out + locate + fit-all, stacked
+// Zoom capsule (2 buttons merged, Apple Maps-style) + locate + fit-all circles.
+const CONTROLS_HEIGHT = RECENTER_SIZE * 4 + 8 * 2;
+
+// Floating-card corner radius — concentric with the device's display corners
+// (≈ display radius minus the 8pt margin). Glass background AND content clips
+// share it so nothing pokes past the curve.
+const CARD_RADIUS = 52;
 
 // The sheet opens at snapPoints[1] ('45%'). gorhom lays the scroll content out
 // against the tallest snap (90%), so to center the empty message within the
@@ -74,8 +86,12 @@ export default function GuideDetail() {
     windowHeight * DEFAULT_SNAP_FRACTION - SHEET_HANDLE_HEIGHT - sheetHeaderHeight,
   );
 
-  // Peek (title bar only, full map) · medium · large — like Apple Maps.
-  const snapPoints = useMemo(() => [120, '45%', '90%'], []);
+  // Peek (floating title pill, full map) · medium · large — like Apple Maps.
+  // The peek snap includes the pill's floating gap: visible pill (88) + gap.
+  // Concentric with the device: the gap matches the side margins, and the home
+  // indicator overlays the card (exactly how Apple's floating sheets sit).
+  const pillGap = spacing.sm;
+  const snapPoints = useMemo(() => [88 + pillGap, '45%', '90%'], [pillGap]);
   const places = useMemo(() => guide?.places ?? [], [guide?.places]);
   const layers = useMemo(() => guide?.layers ?? [], [guide?.layers]);
 
@@ -130,6 +146,37 @@ export default function GuideDetail() {
   const sheetTop = useSharedValue(0);
   const controlsStyle = useAnimatedStyle(() => ({
     transform: [{ translateY: sheetTop.value - CONTROLS_HEIGHT - spacing.md }],
+  }));
+
+  // iOS 26 Maps-style floating card: the glass background floats a constant
+  // gap above the screen bottom at EVERY detent (rounded corners all around,
+  // like Apple Maps). gorhom sizes the background to the sheet's visible
+  // height, so the card edge is just a constant bottom inset — but the CONTENT
+  // runs to the full surface bottom far below the screen, so the scroll area
+  // gets an explicit animated height ending at the card's edge instead.
+  const collapsedPosition = windowHeight - (snapPoints[0] as number);
+  // The background is sized to the sheet's full surface (whose bottom sits far
+  // below the screen at low detents) — measure it and lift the glass's bottom
+  // edge to exactly (screen bottom - gap).
+  const surfaceHeight = useSharedValue(windowHeight);
+  const sheetBgStyle = useAnimatedStyle(() => ({
+    bottom: Math.max(0, sheetTop.value + surfaceHeight.value - windowHeight + pillGap),
+  }));
+  const contentHeightStyle = useAnimatedStyle(() => ({
+    height: Math.max(
+      0,
+      windowHeight - pillGap - sheetTop.value - SHEET_HANDLE_HEIGHT - sheetHeaderHeight,
+    ),
+  }));
+  // Below the collapsed pill line, content fades out as the sheet approaches
+  // the bottom snap — only the title row remains in the pill.
+  const belowPillStyle = useAnimatedStyle(() => ({
+    opacity: interpolate(
+      sheetTop.value,
+      [collapsedPosition - 90, collapsedPosition - 20],
+      [1, 0],
+      Extrapolation.CLAMP,
+    ),
   }));
 
   const fitToPlaces = useCallback(
@@ -413,16 +460,21 @@ export default function GuideDetail() {
         }}
       />
 
-      {/* Floating top bar */}
+      {/* Floating top bar — Liquid Glass chrome over the map */}
       <View style={[styles.topBar, { top: insets.top + spacing.sm }]}>
-        <Pressable
-          onPress={goBack}
-          style={[styles.circleBtn, { backgroundColor: colors.surface }]}
-          hitSlop={8}
+        <GlassSurface
+          interactive
+          style={styles.circleBtn}
+          fallbackStyle={[{ backgroundColor: colors.surface }, styles.fallbackShadow]}
         >
-          <Icon name="chevron.left" size={22} color={colors.textPrimary} />
-        </Pressable>
-        <View style={[styles.titlePill, { backgroundColor: colors.surface }]}>
+          <Pressable onPress={goBack} style={styles.btnInner} hitSlop={8}>
+            <Icon name="chevron.left" size={22} color={colors.textPrimary} />
+          </Pressable>
+        </GlassSurface>
+        <GlassSurface
+          style={styles.titlePill}
+          fallbackStyle={[{ backgroundColor: colors.surface }, styles.fallbackShadow]}
+        >
           <Text style={styles.titleEmoji}>{guide.emoji}</Text>
           <Text
             numberOfLines={1}
@@ -430,74 +482,90 @@ export default function GuideDetail() {
           >
             {guide.name}
           </Text>
-        </View>
-        <Pressable
-          onPress={() => router.push(`/guide/${guide.id}/settings`)}
-          style={[styles.circleBtn, { backgroundColor: colors.surface }]}
-          hitSlop={8}
+        </GlassSurface>
+        <GlassSurface
+          interactive
+          style={styles.circleBtn}
+          fallbackStyle={[{ backgroundColor: colors.surface }, styles.fallbackShadow]}
         >
-          <Icon name="gearshape" size={20} color={colors.textPrimary} />
-        </Pressable>
+          <Pressable
+            onPress={() => router.push(`/guide/${guide.id}/settings`)}
+            style={styles.btnInner}
+            hitSlop={8}
+          >
+            <Icon name="gearshape" size={20} color={colors.textPrimary} />
+          </Pressable>
+        </GlassSurface>
       </View>
 
       {/* "Search this area" pill — appears after the user pans the map */}
       {showSearchArea && (
         <View style={[styles.searchAreaWrap, { top: insets.top + 58 }]} pointerEvents="box-none">
-          <Pressable
-            onPress={searchThisArea}
-            style={({ pressed }) => [
-              styles.searchAreaPill,
-              { backgroundColor: colors.surface },
-              pressed && { opacity: 0.7 },
-            ]}
+          <GlassSurface
+            interactive
+            style={styles.searchAreaPill}
+            fallbackStyle={[{ backgroundColor: colors.surface }, styles.fallbackShadow]}
           >
-            <Icon name="magnifyingglass" size={15} color={colors.accent} />
-            <Text style={[typography.caption, styles.searchAreaText, { color: colors.accent }]}>
-              Search this area
-            </Text>
-          </Pressable>
+            <Pressable
+              onPress={searchThisArea}
+              style={({ pressed }) => [styles.searchAreaInner, pressed && { opacity: 0.7 }]}
+            >
+              <Icon name="magnifyingglass" size={15} color={colors.accent} />
+              <Text style={[typography.caption, styles.searchAreaText, { color: colors.accent }]}>
+                Search this area
+              </Text>
+            </Pressable>
+          </GlassSurface>
         </View>
       )}
 
-      {/* Floating map controls — ride just above the sheet */}
+      {/* Floating map controls — ride just above the sheet. Zoom buttons share
+          one glass capsule, Apple Maps-style; locate + fit are glass circles. */}
       <Animated.View style={[styles.controlsWrap, { right: spacing.lg }, controlsStyle]}>
-        <Pressable
-          onPress={() => zoomBy(0.5)}
-          style={[styles.recenterBtn, { backgroundColor: colors.surface }]}
-          hitSlop={8}
+        <GlassSurface
+          interactive
+          style={styles.zoomPill}
+          fallbackStyle={[{ backgroundColor: colors.surface }, styles.fallbackShadow]}
         >
-          <Icon name="plus" size={24} color={colors.textPrimary} />
-        </Pressable>
-        <Pressable
-          onPress={() => zoomBy(2)}
-          style={[styles.recenterBtn, { backgroundColor: colors.surface }]}
-          hitSlop={8}
+          <Pressable onPress={() => zoomBy(0.5)} style={styles.btnInnerFixed} hitSlop={8}>
+            <Icon name="plus" size={24} color={colors.textPrimary} />
+          </Pressable>
+          <View style={[styles.zoomDivider, { backgroundColor: colors.border }]} />
+          <Pressable onPress={() => zoomBy(2)} style={styles.btnInnerFixed} hitSlop={8}>
+            <Icon name="minus" size={24} color={colors.textPrimary} />
+          </Pressable>
+        </GlassSurface>
+        <GlassSurface
+          interactive
+          style={styles.recenterBtn}
+          fallbackStyle={[{ backgroundColor: colors.surface }, styles.fallbackShadow]}
         >
-          <Icon name="minus" size={24} color={colors.textPrimary} />
-        </Pressable>
-        <Pressable
-          onPress={locateMe}
-          style={[styles.recenterBtn, { backgroundColor: colors.surface }]}
-          hitSlop={8}
+          <Pressable onPress={locateMe} style={styles.btnInner} hitSlop={8}>
+            <Icon name="location" size={22} color={colors.accent} />
+          </Pressable>
+        </GlassSurface>
+        <GlassSurface
+          interactive
+          style={styles.recenterBtn}
+          fallbackStyle={[{ backgroundColor: colors.surface }, styles.fallbackShadow]}
         >
-          <Icon name="location" size={22} color={colors.accent} />
-        </Pressable>
-        <Pressable
-          onPress={() => {
-            Haptics.selectionAsync();
-            setShowSearchArea(false);
-            fitToPlaces(true);
-          }}
-          disabled={visiblePlaces.length === 0}
-          style={[styles.recenterBtn, { backgroundColor: colors.surface }]}
-          hitSlop={8}
-        >
-          <Icon
-            name="viewfinder"
-            size={22}
-            color={visiblePlaces.length === 0 ? colors.textTertiary : colors.textPrimary}
-          />
-        </Pressable>
+          <Pressable
+            onPress={() => {
+              Haptics.selectionAsync();
+              setShowSearchArea(false);
+              fitToPlaces(true);
+            }}
+            disabled={visiblePlaces.length === 0}
+            style={styles.btnInner}
+            hitSlop={8}
+          >
+            <Icon
+              name="viewfinder"
+              size={22}
+              color={visiblePlaces.length === 0 ? colors.textTertiary : colors.textPrimary}
+            />
+          </Pressable>
+        </GlassSurface>
       </Animated.View>
 
       <BottomSheet
@@ -506,7 +574,24 @@ export default function GuideDetail() {
         snapPoints={snapPoints}
         enableDynamicSizing={false}
         animatedPosition={sheetTop}
-        backgroundStyle={{ backgroundColor: colors.surface }}
+        style={styles.sheetFloat}
+        backgroundComponent={({ style }) => (
+          <View style={style} pointerEvents="none">
+            {/* Measures the surface's true (taller-than-screen) height. */}
+            <View
+              style={StyleSheet.absoluteFill}
+              onLayout={(e) => {
+                surfaceHeight.value = e.nativeEvent.layout.height;
+              }}
+            />
+            <Animated.View style={[styles.sheetGlassWrap, sheetBgStyle]}>
+              <GlassSurface
+                style={styles.sheetGlass}
+                fallbackStyle={{ backgroundColor: colors.surface }}
+              />
+            </Animated.View>
+          </View>
+        )}
         handleIndicatorStyle={{ backgroundColor: colors.handle }}
       >
         <View
@@ -527,7 +612,7 @@ export default function GuideDetail() {
                 onPress={() => router.push(`/guide/${guide.id}/share`)}
                 style={({ pressed }) => [
                   styles.iconBtn,
-                  { backgroundColor: colors.surfaceAlt },
+                  { backgroundColor: colors.fill },
                   pressed && { opacity: 0.6 },
                 ]}
                 hitSlop={6}
@@ -540,7 +625,7 @@ export default function GuideDetail() {
                 onPress={() => router.push(`/guide/${guide.id}/layers`)}
                 style={({ pressed }) => [
                   styles.iconBtn,
-                  { backgroundColor: colors.surfaceAlt },
+                  { backgroundColor: colors.fill },
                   pressed && { opacity: 0.6 },
                 ]}
                 hitSlop={6}
@@ -564,106 +649,120 @@ export default function GuideDetail() {
           </View>
         </View>
 
-        {layers.length > 0 && (
-          <View style={styles.toolbar}>
-            <Pressable
-              onPress={toggleShowAll}
-              style={({ pressed }) => [
-                styles.toolBtn,
-                { backgroundColor: colors.surfaceAlt },
-                pressed && { opacity: 0.6 },
-              ]}
-            >
-              <Icon name={allHidden ? 'eye' : 'eye.slash'} size={15} color={colors.textSecondary} />
-              <Text style={[typography.caption, styles.toolLabel, { color: colors.textSecondary }]}>
-                {allHidden ? 'Show all' : 'Hide all'}
-              </Text>
-            </Pressable>
-
-            <Pressable
-              onPress={toggleCollapseAll}
-              style={({ pressed }) => [
-                styles.toolBtn,
-                { backgroundColor: colors.surfaceAlt },
-                pressed && { opacity: 0.6 },
-              ]}
-            >
-              <Icon
-                name={allCollapsed ? 'chevron.down' : 'chevron.up'}
-                size={15}
-                color={colors.textSecondary}
-              />
-              <Text style={[typography.caption, styles.toolLabel, { color: colors.textSecondary }]}>
-                {allCollapsed ? 'Expand all' : 'Collapse all'}
-              </Text>
-            </Pressable>
-          </View>
-        )}
-
-        <BottomSheetSectionList
-          sections={sections}
-          keyExtractor={(p) => p.id}
-          stickySectionHeadersEnabled={false}
-          contentContainerStyle={{
-            paddingHorizontal: spacing.lg,
-            paddingBottom: insets.bottom + spacing.xl,
-          }}
-          ListEmptyComponent={
-            <View style={[styles.sheetEmpty, { height: emptyStateHeight }]}>
-              <Icon name="mappin" size={30} color={colors.textTertiary} />
-              <Text style={[typography.body, { color: colors.textSecondary, textAlign: 'center' }]}>
-                Tap “Add” to search for places and drop them on the map.
-              </Text>
-            </View>
-          }
-          renderSectionHeader={({ section }) => (
-            <Pressable
-              onPress={() => collapseLayer(section.layer)}
-              style={({ pressed }) => [styles.layerHeader, pressed && { opacity: 0.6 }]}
-            >
-              <Icon
-                name={section.layer.collapsed ? 'chevron.right' : 'chevron.down'}
-                size={16}
-                color={colors.textTertiary}
-              />
-              <View style={[styles.layerBadge, { backgroundColor: section.layer.color + '22' }]}>
-                <LayerIcon name={section.layer.icon} size={15} tintColor={section.layer.color} />
-              </View>
-              <Text
-                numberOfLines={1}
-                style={[typography.bodyMedium, { color: colors.textPrimary, flex: 1 }]}
-              >
-                {section.layer.name}
-              </Text>
-              <Text
-                style={[
-                  typography.caption,
-                  { color: colors.textTertiary, marginRight: spacing.md },
+        {/* Height-bound to the card's floating bottom edge; fades out near the
+            collapsed snap so only the title row remains in the pill. */}
+        <Animated.View style={[styles.clip, belowPillStyle, contentHeightStyle]}>
+          {layers.length > 0 && (
+            <View style={styles.toolbar}>
+              <Pressable
+                onPress={toggleShowAll}
+                style={({ pressed }) => [
+                  styles.toolBtn,
+                  { backgroundColor: colors.fill },
+                  pressed && { opacity: 0.6 },
                 ]}
               >
-                {section.count}
-              </Text>
-              <Pressable onPress={() => hideLayer(section.layer)} hitSlop={10}>
                 <Icon
-                  name={section.layer.hidden ? 'eye.slash' : 'eye'}
-                  size={20}
-                  color={section.layer.hidden ? colors.textTertiary : colors.accent}
+                  name={allHidden ? 'eye' : 'eye.slash'}
+                  size={15}
+                  color={colors.textSecondary}
                 />
+                <Text
+                  style={[typography.caption, styles.toolLabel, { color: colors.textSecondary }]}
+                >
+                  {allHidden ? 'Show all' : 'Hide all'}
+                </Text>
               </Pressable>
-            </Pressable>
+
+              <Pressable
+                onPress={toggleCollapseAll}
+                style={({ pressed }) => [
+                  styles.toolBtn,
+                  { backgroundColor: colors.fill },
+                  pressed && { opacity: 0.6 },
+                ]}
+              >
+                <Icon
+                  name={allCollapsed ? 'chevron.down' : 'chevron.up'}
+                  size={15}
+                  color={colors.textSecondary}
+                />
+                <Text
+                  style={[typography.caption, styles.toolLabel, { color: colors.textSecondary }]}
+                >
+                  {allCollapsed ? 'Expand all' : 'Collapse all'}
+                </Text>
+              </Pressable>
+            </View>
           )}
-          renderItem={({ item, section }) => (
-            <PlaceRow
-              place={item}
-              color={section.layer.color}
-              onPress={() => goToPlace(item)}
-              onLongPress={() => showPlaceMenu(item)}
-              onDelete={() => removePlaceFromGuide(guide.id, item.id)}
-              readOnly={!canEdit}
-              visited={!!visited[item.id]}
-            />
-          )}
-        />
+
+          <BottomSheetSectionList
+            sections={sections}
+            keyExtractor={(p) => p.id}
+            stickySectionHeadersEnabled={false}
+            contentContainerStyle={{
+              paddingHorizontal: spacing.lg,
+              paddingBottom: insets.bottom + spacing.xl,
+            }}
+            ListEmptyComponent={
+              <View style={[styles.sheetEmpty, { height: emptyStateHeight }]}>
+                <Icon name="mappin" size={30} color={colors.textTertiary} />
+                <Text
+                  style={[typography.body, { color: colors.textSecondary, textAlign: 'center' }]}
+                >
+                  Tap “Add” to search for places and drop them on the map.
+                </Text>
+              </View>
+            }
+            renderSectionHeader={({ section }) => (
+              <Pressable
+                onPress={() => collapseLayer(section.layer)}
+                style={({ pressed }) => [styles.layerHeader, pressed && { opacity: 0.6 }]}
+              >
+                <Icon
+                  name={section.layer.collapsed ? 'chevron.right' : 'chevron.down'}
+                  size={16}
+                  color={colors.textTertiary}
+                />
+                <View style={[styles.layerBadge, { backgroundColor: section.layer.color + '22' }]}>
+                  <LayerIcon name={section.layer.icon} size={15} tintColor={section.layer.color} />
+                </View>
+                <Text
+                  numberOfLines={1}
+                  style={[typography.bodyMedium, { color: colors.textPrimary, flex: 1 }]}
+                >
+                  {section.layer.name}
+                </Text>
+                <Text
+                  style={[
+                    typography.caption,
+                    { color: colors.textTertiary, marginRight: spacing.md },
+                  ]}
+                >
+                  {section.count}
+                </Text>
+                <Pressable onPress={() => hideLayer(section.layer)} hitSlop={10}>
+                  <Icon
+                    name={section.layer.hidden ? 'eye.slash' : 'eye'}
+                    size={20}
+                    color={section.layer.hidden ? colors.textTertiary : colors.accent}
+                  />
+                </Pressable>
+              </Pressable>
+            )}
+            renderItem={({ item, section }) => (
+              <PlaceRow
+                place={item}
+                color={section.layer.color}
+                onPress={() => goToPlace(item)}
+                onLongPress={() => showPlaceMenu(item)}
+                onDelete={() => removePlaceFromGuide(guide.id, item.id)}
+                readOnly={!canEdit}
+                visited={!!visited[item.id]}
+              />
+            )}
+          />
+        </Animated.View>
       </BottomSheet>
     </View>
   );
@@ -683,8 +782,19 @@ const styles = StyleSheet.create({
     width: 40,
     height: 40,
     borderRadius: radius.pill,
+    overflow: 'hidden',
+  },
+  // Centers the icon inside a GlassSurface of any size.
+  btnInner: { flex: 1, alignItems: 'center', justifyContent: 'center' },
+  // One fixed-height button inside the zoom capsule.
+  btnInnerFixed: {
+    width: RECENTER_SIZE,
+    height: RECENTER_SIZE,
     alignItems: 'center',
     justifyContent: 'center',
+  },
+  // Pre-Liquid-Glass look: the solid chrome these elements had before.
+  fallbackShadow: {
     shadowColor: '#000',
     shadowOpacity: 0.12,
     shadowRadius: 6,
@@ -703,30 +813,32 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   searchAreaPill: {
+    height: 38,
+    borderRadius: radius.pill,
+    overflow: 'hidden',
+  },
+  searchAreaInner: {
+    flex: 1,
     flexDirection: 'row',
     alignItems: 'center',
     gap: spacing.xs,
     paddingHorizontal: spacing.lg,
-    height: 38,
-    borderRadius: radius.pill,
-    shadowColor: '#000',
-    shadowOpacity: 0.15,
-    shadowRadius: 6,
-    shadowOffset: { width: 0, height: 2 },
-    elevation: 4,
   },
   searchAreaText: { fontWeight: '600' },
   recenterBtn: {
     width: RECENTER_SIZE,
     height: RECENTER_SIZE,
     borderRadius: radius.pill,
-    alignItems: 'center',
-    justifyContent: 'center',
-    shadowColor: '#000',
-    shadowOpacity: 0.12,
-    shadowRadius: 6,
-    shadowOffset: { width: 0, height: 2 },
-    elevation: 3,
+    overflow: 'hidden',
+  },
+  zoomPill: {
+    width: RECENTER_SIZE,
+    borderRadius: RECENTER_SIZE / 2,
+    overflow: 'hidden',
+  },
+  zoomDivider: {
+    height: StyleSheet.hairlineWidth,
+    marginHorizontal: 10,
   },
   titlePill: {
     flexDirection: 'row',
@@ -735,11 +847,34 @@ const styles = StyleSheet.create({
     paddingHorizontal: spacing.md,
     height: 40,
     borderRadius: radius.pill,
-    shadowColor: '#000',
-    shadowOpacity: 0.12,
-    shadowRadius: 6,
-    shadowOffset: { width: 0, height: 2 },
-    elevation: 3,
+  },
+  // Floating glass panel, inset from the screen edges at every detent. The
+  // radius + clip here round the content's TOP corners (the surface's bottom
+  // corners live below the screen, so the content wrapper rounds those).
+  sheetFloat: {
+    marginHorizontal: spacing.sm,
+    borderRadius: CARD_RADIUS,
+    overflow: 'hidden',
+  },
+  clip: {
+    overflow: 'hidden',
+    borderBottomLeftRadius: CARD_RADIUS,
+    borderBottomRightRadius: CARD_RADIUS,
+  },
+  // The card's glass background. Corner radius is concentric with the device:
+  // roughly the display's corner radius minus the 8pt margin, so the card's
+  // curves run parallel to the screen corners (Apple's floating-sheet look).
+  sheetGlassWrap: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    borderRadius: CARD_RADIUS,
+    overflow: 'hidden',
+  },
+  sheetGlass: {
+    ...StyleSheet.absoluteFillObject,
+    borderRadius: CARD_RADIUS,
   },
   titleEmoji: { fontSize: 18 },
   sheetHeader: {

@@ -1,10 +1,7 @@
 import Icon from '@/components/Icon';
 import { useCallback, useEffect } from 'react';
-import { Dimensions, StyleSheet, Text, View } from 'react-native';
-// RNGH's Pressable, not RN's: inside this gesture-handler hierarchy (pan +
-// the sheet's scrollable) with a Reanimated transform, RN Pressable's touches
-// get cancelled and onPress never fires (see RNGH #4496).
-import { Gesture, GestureDetector, Pressable } from 'react-native-gesture-handler';
+import { Dimensions, Pressable, StyleSheet, Text, View } from 'react-native';
+import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 import Reanimated, {
   runOnJS,
   useAnimatedStyle,
@@ -129,7 +126,9 @@ export default function PlaceRow({
 
       {/* Sliding row content */}
       <GestureDetector gesture={pan}>
-        <Reanimated.View style={[styles.slide, { backgroundColor: colors.surface }, rowStyle]}>
+        {/* Transparent, so the sheet's Liquid Glass shows through — the delete
+            action behind is width-clipped to the swipe, never visible at rest. */}
+        <Reanimated.View style={[styles.slide, rowStyle]}>
           <Pressable
             onPress={onPress}
             onLongPress={onLongPress}

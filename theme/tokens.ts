@@ -18,6 +18,8 @@ export const palette = {
     accent: '#007AFF',
     danger: '#FF3B30',
     handle: '#D1D1D6',
+    /** iOS secondarySystemFill — translucent button fill that works on glass. */
+    fill: 'rgba(120, 120, 128, 0.16)',
   },
   dark: {
     background: '#000000',
@@ -30,6 +32,8 @@ export const palette = {
     accent: '#0A84FF',
     danger: '#FF453A',
     handle: '#48484A',
+    /** iOS secondarySystemFill (dark) — translucent button fill on glass. */
+    fill: 'rgba(120, 120, 128, 0.32)',
   },
 };
 
