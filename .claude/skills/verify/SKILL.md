@@ -5,11 +5,11 @@ Recipe for exercising changes in the real app. Expo dev-client + Metro; no Expo 
 ## Launch
 
 - Metro usually already runs on port 8081 (check `lsof -iTCP:8081 -sTCP:LISTEN`; its cwd should be this repo). If not: `npm start`.
-- Dev client is installed on the booted simulators as `com.anonymous.guided`. Find booted devices: `xcrun simctl list devices booted`. Multiple sims may be booted — pick one UDID and use it consistently (`pgrep Guided` matches ALL sims' processes; get the right pid via `xcrun simctl spawn <udid> launchctl list | grep guided`).
-- Launch: `xcrun simctl terminate <udid> com.anonymous.guided; xcrun simctl launch <udid> com.anonymous.guided` then wait ~10s for the JS bundle.
+- Dev client is installed on the booted simulators as `com.guidedmaps.app`. Find booted devices: `xcrun simctl list devices booted`. Multiple sims may be booted — pick one UDID and use it consistently (`pgrep Guided` matches ALL sims' processes; get the right pid via `xcrun simctl spawn <udid> launchctl list | grep guided`).
+- Launch: `xcrun simctl terminate <udid> com.guidedmaps.app; xcrun simctl launch <udid> com.guidedmaps.app` then wait ~10s for the JS bundle.
 - Navigate via deep link (expo-router, scheme `guided`): `xcrun simctl openurl <udid> "guided://guide/<guideId>"`. iOS sometimes shows an "Open in Guided?" confirm dialog — tap Open via idb (below).
 - Guide ids / place data live in AsyncStorage:
-  `$(xcrun simctl get_app_container <udid> com.anonymous.guided data)/Library/Application Support/com.anonymous.guided/RCTAsyncLocalStorage_V1/` — key `guide-maker-storage-v1`; large values are in files named md5(key). Read-only inspection is fine; don't mutate (guides sync to Supabase).
+  `$(xcrun simctl get_app_container <udid> com.guidedmaps.app data)/Library/Application Support/com.guidedmaps.app/RCTAsyncLocalStorage_V1/` — key `guide-maker-storage-v1`; large values are in files named md5(key). Read-only inspection is fine; don't mutate (guides sync to Supabase).
 
 ## Drive (taps/swipes)
 
