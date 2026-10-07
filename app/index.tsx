@@ -1,7 +1,8 @@
 import Icon from '@/components/Icon';
 import * as Haptics from 'expo-haptics';
 import { useRouter } from 'expo-router';
-import { useMemo, useState, type ReactNode } from 'react';
+import { useShareIntentContext } from 'expo-share-intent';
+import { useEffect, useMemo, useState, type ReactNode } from 'react';
 import { Alert, FlatList, Pressable, StyleSheet, Text, View } from 'react-native';
 import {
   NestedReorderableList,
@@ -10,9 +11,12 @@ import {
   type ReorderableListReorderEvent,
 } from 'react-native-reorderable-list';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import BusyOverlay from '@/components/BusyOverlay';
 import GuideCard from '@/components/GuideCard';
 import GuideCardSkeleton from '@/components/GuideCardSkeleton';
 import GuideEditor, { type GuideDraft } from '@/components/GuideEditor';
+import { decodeAppleGuideLink } from '@/lib/appleGuideImport';
+import { isAppleSearchAvailable, lookupApplePlaces } from '@/modules/apple-search';
 import SwipeActionRow, { type SwipeAction } from '@/components/SwipeActionRow';
 import type { Guide } from '@/lib/types';
 import { useGuides } from '@/store/guides';
@@ -34,12 +38,25 @@ export default function GuidesHome() {
   const hydrated = useGuides((s) => s.hydrated);
   const initialSyncDone = useGuides((s) => s.initialSyncDone);
   const createGuide = useGuides((s) => s.createGuide);
+  const addPlaceToGuide = useGuides((s) => s.addPlaceToGuide);
   const updateGuide = useGuides((s) => s.updateGuide);
   const deleteGuide = useGuides((s) => s.deleteGuide);
   const togglePinGuide = useGuides((s) => s.togglePinGuide);
   const setGuidesOrder = useGuides((s) => s.setGuidesOrder);
 
   const [editor, setEditor] = useState<EditorState | null>(null);
+  const [importing, setImporting] = useState(false);
+
+  // Shared straight from Apple Maps' share sheet (share extension): consume
+  // the link and run the guide import — no copy/paste needed.
+  const { hasShareIntent, shareIntent, resetShareIntent } = useShareIntentContext();
+  useEffect(() => {
+    if (!hasShareIntent) return;
+    const url = shareIntent.webUrl ?? shareIntent.text ?? '';
+    resetShareIntent();
+    if (url) void runImport(url);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [hasShareIntent]);
   const [reordering, setReordering] = useState(false);
   const editingGuide = editor?.mode === 'edit' ? guides.find((g) => g.id === editor.id) : undefined;
 
@@ -81,8 +98,7 @@ export default function GuidesHome() {
     [rows],
   );
 
-  function handleCreate() {
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+  function openCreateEditor() {
     const seed = guides.length;
     setEditor({
       mode: 'create',
@@ -92,6 +108,55 @@ export default function GuidesHome() {
         emoji: GUIDE_EMOJIS[seed % GUIDE_EMOJIS.length],
       },
     });
+  }
+
+  function handleCreate() {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    // Straight into the editor — creating from scratch is the common case.
+    // Importing is offered as a secondary action inside the create sheet.
+    openCreateEditor();
+  }
+
+  function promptImport() {
+    Alert.prompt(
+      'Import from Apple Maps',
+      'Paste the share link of an Apple Maps guide (Guides → share).',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        { text: 'Import', onPress: (link?: string) => link && runImport(link) },
+      ],
+      'plain-text',
+      undefined,
+      'url',
+    );
+  }
+
+  async function runImport(link: string) {
+    setImporting(true);
+    try {
+      const decoded = await decodeAppleGuideLink(link);
+      const places = await lookupApplePlaces(decoded.placeIds);
+      if (places.length === 0) {
+        throw new Error('None of the places in that guide could be loaded.');
+      }
+      const guide = createGuide(decoded.name);
+      for (const place of places) {
+        addPlaceToGuide(guide.id, place);
+      }
+      setImporting(false);
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      const skipped = decoded.placeIds.length - places.length;
+      if (skipped > 0) {
+        Alert.alert(
+          'Guide imported',
+          `${places.length} place${places.length === 1 ? '' : 's'} imported; ${skipped} could not be found.`,
+        );
+      }
+      router.push(`/guide/${guide.id}`);
+    } catch (e: any) {
+      setImporting(false);
+      Alert.alert('Import failed', e?.message ?? 'Please try again.');
+    }
   }
 
   function handleEdit(guide: Guide) {
@@ -399,8 +464,18 @@ export default function GuidesHome() {
         onTogglePin={editor?.mode === 'edit' ? () => togglePinGuide(editor.id) : undefined}
         onSubmit={handleSubmit}
         onDelete={editor?.mode === 'edit' ? handleDelete : undefined}
+        onImport={
+          isAppleSearchAvailable
+            ? () => {
+                setEditor(null);
+                promptImport();
+              }
+            : undefined
+        }
         onClose={() => setEditor(null)}
       />
+
+      <BusyOverlay visible={importing} label="Importing guide…" />
     </View>
   );
 }

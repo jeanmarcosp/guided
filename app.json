@@ -65,7 +65,8 @@
           "backgroundColor": "#132A13"
         }
       ],
-      "expo-apple-authentication"
+      "expo-apple-authentication",
+      "expo-share-intent"
     ],
     "extra": {
       "router": {},

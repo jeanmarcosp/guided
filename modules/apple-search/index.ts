@@ -53,6 +53,16 @@ export async function searchApple(
   return raw.map(rawToResult);
 }
 
+/**
+ * Batch-resolve stable Apple Place IDs ("I" + hex) to full places. Skips ids
+ * that no longer resolve. iOS 18+ — rejects with UNSUPPORTED below that.
+ */
+export async function lookupApplePlaces(ids: string[]): Promise<SearchResult[]> {
+  if (!AppleSearch) throw new Error('AppleSearch native module is unavailable');
+  const raw: RawResult[] = await AppleSearch.lookupPlaces(ids);
+  return raw.map(rawToResult);
+}
+
 /** A type-ahead suggestion from MKLocalSearchCompleter — no coordinates yet. */
 export type AppleCompletion = {
   /** Index into the native module's latest completion set (for resolving). */

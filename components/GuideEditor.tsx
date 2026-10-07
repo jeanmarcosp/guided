@@ -25,6 +25,8 @@ type Props = {
   onTogglePin?: () => void;
   onSubmit: (draft: GuideDraft) => void;
   onDelete?: () => void;
+  /** Create mode only: offer importing an Apple Maps guide instead. */
+  onImport?: () => void;
   onClose: () => void;
 };
 
@@ -36,6 +38,7 @@ export default function GuideEditor({
   onTogglePin,
   onSubmit,
   onDelete,
+  onImport,
   onClose,
 }: Props) {
   const colors = useColors();
@@ -174,6 +177,19 @@ export default function GuideEditor({
               <Text style={[typography.bodyMedium, { color: colors.danger }]}>Delete Guide</Text>
             </Pressable>
           )}
+
+          {mode === 'create' && onImport && (
+            <Pressable
+              onPress={onImport}
+              hitSlop={8}
+              style={({ pressed }) => [styles.importRow, pressed && { opacity: 0.6 }]}
+            >
+              <Icon name="square.and.arrow.down" size={16} color={colors.accent} />
+              <Text style={[typography.bodyMedium, { color: colors.accent }]}>
+                Import from Apple Maps instead
+              </Text>
+            </Pressable>
+          )}
         </Animated.View>
       </KeyboardAvoidingView>
     </Modal>
@@ -228,6 +244,14 @@ const styles = StyleSheet.create({
     marginTop: spacing.xs,
   },
   deleteBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: spacing.sm,
+    paddingVertical: spacing.md,
+    marginTop: spacing.xs,
+  },
+  importRow: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',

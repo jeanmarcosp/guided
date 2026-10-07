@@ -70,6 +70,33 @@ public class AppleSearchModule: Module {
       }
     }
 
+    // Batch-resolve stable Place IDs ("I" + hex muid) to full places — used by
+    // the Apple Maps guide import. Unresolvable ids are skipped; result order
+    // follows the input. Requires iOS 18 (MKMapItemRequest by identifier).
+    AsyncFunction("lookupPlaces") { (ids: [String], promise: Promise) in
+      DispatchQueue.main.async {
+        guard #available(iOS 18.0, *) else {
+          promise.reject("UNSUPPORTED", "Importing guides requires iOS 18 or later.")
+          return
+        }
+        var results = [[String: Any]?](repeating: nil, count: ids.count)
+        let group = DispatchGroup()
+        for (index, raw) in ids.enumerated() {
+          guard let identifier = MKMapItem.Identifier(rawValue: raw) else { continue }
+          group.enter()
+          MKMapItemRequest(mapItemIdentifier: identifier).getMapItem { item, _ in
+            if let item {
+              results[index] = AppleSearchModule.placeDict(item)
+            }
+            group.leave()
+          }
+        }
+        group.notify(queue: .main) {
+          promise.resolve(results.compactMap { $0 })
+        }
+      }
+    }
+
     // Resolve a completion (by index into the most recent set) to a concrete
     // place. Rejects if the list changed under the tap — callers fall back to
     // a plain text search.
