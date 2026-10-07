@@ -7,9 +7,11 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   ActionSheetIOS,
   Alert,
+  Keyboard,
   Pressable,
   StyleSheet,
   Text,
+  TextInput,
   useWindowDimensions,
   View,
 } from 'react-native';
@@ -30,6 +32,11 @@ import type { Layer, Place } from '@/lib/types';
 import { useGuides } from '@/store/guides';
 import { useVisits } from '@/store/visits';
 import { radius, spacing, typography, useColors } from '@/theme/tokens';
+
+/** Matches a saved place by name. */
+function placeMatches(p: Place, q: string): boolean {
+  return p.name.toLowerCase().includes(q);
+}
 
 const DEFAULT_REGION: Region = {
   latitude: 37.7749,
@@ -74,10 +81,15 @@ export default function GuideDetail() {
 
   const mapRef = useRef<GuidedMapRef>(null);
   const sheetRef = useRef<BottomSheet>(null);
+  const searchInputRef = useRef<TextInput>(null);
   const mapReady = useRef(false);
   const prevCount = useRef(guide?.places.length ?? 0);
   const [showSearchArea, setShowSearchArea] = useState(false);
   const [sheetHeaderHeight, setSheetHeaderHeight] = useState(0);
+  const [searchOpen, setSearchOpen] = useState(false);
+  const [search, setSearch] = useState('');
+  const query = search.trim().toLowerCase();
+  const searching = query.length > 0;
 
   // Height of the list area visible at the default (45%) snap, so the empty-state
   // message centers within what the user actually sees on first open.
@@ -126,6 +138,12 @@ export default function GuideDetail() {
     return places.filter((p) => !hiddenIds.has(p.layerId ?? ''));
   }, [places, layers]);
 
+  // When searching, narrow the pins to matches; otherwise show every visible pin.
+  const mapPlaces = useMemo(
+    () => (searching ? visiblePlaces.filter((p) => placeMatches(p, query)) : visiblePlaces),
+    [searching, query, visiblePlaces],
+  );
+
   // One section per layer, in the guide's layer order. A collapsed layer keeps
   // its header but shows no rows (collapse is list-only; hide affects pins).
   const sections = useMemo(() => {
@@ -136,11 +154,21 @@ export default function GuideDetail() {
       arr.push(p);
       byLayer.set(key, arr);
     }
+    // While searching, show matches across every layer (even collapsed ones) and
+    // drop layers with no match. Otherwise respect each layer's collapsed state.
+    if (searching) {
+      return layers
+        .map((layer) => {
+          const matches = (byLayer.get(layer.id) ?? []).filter((p) => placeMatches(p, query));
+          return { layer, count: matches.length, data: matches };
+        })
+        .filter((s) => s.count > 0);
+    }
     return layers.map((layer) => {
       const all = byLayer.get(layer.id) ?? [];
       return { layer, count: all.length, data: layer.collapsed ? [] : all };
     });
-  }, [places, layers]);
+  }, [places, layers, searching, query]);
 
   // Tracks the top edge of the bottom sheet so the map controls ride above it.
   const sheetTop = useSharedValue(0);
@@ -427,6 +455,21 @@ export default function GuideDetail() {
     });
   }
 
+  function openPlaceSearch() {
+    Haptics.selectionAsync();
+    setSearchOpen(true);
+    // Open to the medium detent (not full height) so the field and some results
+    // are visible while the map stays in view.
+    sheetRef.current?.snapToIndex(1);
+    setTimeout(() => searchInputRef.current?.focus(), 250);
+  }
+
+  function closePlaceSearch() {
+    Keyboard.dismiss();
+    setSearch('');
+    setSearchOpen(false);
+  }
+
   // Guide was deleted while open.
   if (!guide) {
     return (
@@ -448,7 +491,7 @@ export default function GuideDetail() {
     <View style={styles.fill}>
       <GuideMap
         ref={mapRef}
-        places={visiblePlaces}
+        places={mapPlaces}
         layerColors={layerColors}
         layerIcons={layerIcons}
         initialRegion={DEFAULT_REGION}
@@ -607,6 +650,19 @@ export default function GuideDetail() {
             </Text>
           </View>
           <View style={styles.headerActions}>
+            {places.length > 0 && !searchOpen && (
+              <Pressable
+                onPress={openPlaceSearch}
+                style={({ pressed }) => [
+                  styles.iconBtn,
+                  { backgroundColor: colors.fill },
+                  pressed && { opacity: 0.6 },
+                ]}
+                hitSlop={6}
+              >
+                <Icon name="magnifyingglass" size={20} color={colors.textPrimary} />
+              </Pressable>
+            )}
             {isOwner && (
               <Pressable
                 onPress={() => router.push(`/guide/${guide.id}/share`)}
@@ -652,7 +708,34 @@ export default function GuideDetail() {
         {/* Height-bound to the card's floating bottom edge; fades out near the
             collapsed snap so only the title row remains in the pill. */}
         <Animated.View style={[styles.clip, belowPillStyle, contentHeightStyle]}>
-          {layers.length > 0 && (
+          {searchOpen && (
+            <View style={styles.searchRow}>
+              <View style={[styles.searchBox, { backgroundColor: colors.fill }]}>
+                <Icon name="magnifyingglass" size={18} color={colors.textTertiary} />
+                <TextInput
+                  ref={searchInputRef}
+                  value={search}
+                  onChangeText={setSearch}
+                  placeholder="Search this guide"
+                  placeholderTextColor={colors.textTertiary}
+                  autoCorrect={false}
+                  returnKeyType="search"
+                  clearButtonMode="never"
+                  style={[styles.searchInput, { color: colors.textPrimary }]}
+                />
+                {search.length > 0 && (
+                  <Pressable onPress={() => setSearch('')} hitSlop={8}>
+                    <Icon name="xmark.circle.fill" size={18} color={colors.textTertiary} />
+                  </Pressable>
+                )}
+              </View>
+              <Pressable onPress={closePlaceSearch} hitSlop={8}>
+                <Text style={[typography.bodyMedium, { color: colors.accent }]}>Cancel</Text>
+              </Pressable>
+            </View>
+          )}
+
+          {layers.length > 0 && !searchOpen && (
             <View style={styles.toolbar}>
               <Pressable
                 onPress={toggleShowAll}
@@ -706,11 +789,17 @@ export default function GuideDetail() {
             }}
             ListEmptyComponent={
               <View style={[styles.sheetEmpty, { height: emptyStateHeight }]}>
-                <Icon name="mappin" size={30} color={colors.textTertiary} />
+                <Icon
+                  name={searching ? 'magnifyingglass' : 'mappin'}
+                  size={30}
+                  color={colors.textTertiary}
+                />
                 <Text
                   style={[typography.body, { color: colors.textSecondary, textAlign: 'center' }]}
                 >
-                  Tap “Add” to search for places and drop them on the map.
+                  {searching
+                    ? `No places match “${search.trim()}”.`
+                    : 'Tap “Add” to search for places and drop them on the map.'}
                 </Text>
               </View>
             }
@@ -887,6 +976,23 @@ const styles = StyleSheet.create({
   },
   sheetHeaderText: { flex: 1, marginRight: spacing.md },
   headerActions: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
+  searchRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.md,
+    paddingHorizontal: spacing.lg,
+    paddingBottom: spacing.sm,
+  },
+  searchBox: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
+    paddingHorizontal: spacing.md,
+    height: 40,
+    borderRadius: radius.sm,
+  },
+  searchInput: { flex: 1, fontSize: 16, paddingVertical: 0, letterSpacing: 0 }, // letterSpacing guards vs RN#42589
   toolbar: {
     flexDirection: 'row',
     gap: spacing.sm,

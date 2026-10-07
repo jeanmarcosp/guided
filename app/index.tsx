@@ -2,8 +2,8 @@ import Icon from '@/components/Icon';
 import * as Haptics from 'expo-haptics';
 import { useRouter } from 'expo-router';
 import { useShareIntentContext } from 'expo-share-intent';
-import { useEffect, useMemo, useState, type ReactNode } from 'react';
-import { Alert, FlatList, Pressable, StyleSheet, Text, View } from 'react-native';
+import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
+import { Alert, FlatList, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 import {
   NestedReorderableList,
   ScrollViewContainer,
@@ -29,6 +29,11 @@ type Row = { type: 'header'; label: string } | { type: 'guide'; guide: Guide; sh
 /** A guide shared with the user (not owned). */
 const isShared = (g: Guide) => g.role === 'viewer' || g.role === 'editor';
 
+/** Matches a guide by its name. */
+function guideMatches(g: Guide, q: string): boolean {
+  return g.name.toLowerCase().includes(q);
+}
+
 export default function GuidesHome() {
   const colors = useColors();
   const insets = useSafeAreaInsets();
@@ -46,6 +51,22 @@ export default function GuidesHome() {
 
   const [editor, setEditor] = useState<EditorState | null>(null);
   const [importing, setImporting] = useState(false);
+  const [searchOpen, setSearchOpen] = useState(false);
+  const [search, setSearch] = useState('');
+  const query = search.trim().toLowerCase();
+  const searching = query.length > 0;
+  const searchInputRef = useRef<TextInput>(null);
+
+  function openSearch() {
+    Haptics.selectionAsync();
+    setSearchOpen(true);
+    setTimeout(() => searchInputRef.current?.focus(), 50);
+  }
+
+  function closeSearch() {
+    setSearch('');
+    setSearchOpen(false);
+  }
 
   // Shared straight from Apple Maps' share sheet (share extension): consume
   // the link and run the guide import — no copy/paste needed.
@@ -97,6 +118,17 @@ export default function GuidesHome() {
     () => rows.map((row, i) => (row.type === 'header' ? i : -1)).filter((i) => i >= 0),
     [rows],
   );
+
+  // While searching, show a flat list of matching guides (owned first, then
+  // shared) — no section headers, pinning, or reordering.
+  const filteredRows = useMemo<Row[]>(() => {
+    if (!searching) return [];
+    const match = (g: Guide) => guideMatches(g, query);
+    return [
+      ...ownedGuides.filter(match).map((g): Row => ({ type: 'guide', guide: g })),
+      ...sharedGuides.filter(match).map((g): Row => ({ type: 'guide', guide: g, shared: true })),
+    ];
+  }, [searching, query, ownedGuides, sharedGuides]);
 
   function openCreateEditor() {
     const seed = guides.length;
@@ -372,7 +404,20 @@ export default function GuidesHome() {
               >
                 <Icon name="person.circle" size={22} color={colors.textPrimary} />
               </Pressable>
-              {canReorder && (
+              {guides.length > 0 && (
+                <Pressable
+                  onPress={openSearch}
+                  style={({ pressed }) => [
+                    styles.iconBtn,
+                    { backgroundColor: colors.surface, borderColor: colors.border },
+                    pressed && { opacity: 0.6 },
+                  ]}
+                  hitSlop={8}
+                >
+                  <Icon name="magnifyingglass" size={20} color={colors.textPrimary} />
+                </Pressable>
+              )}
+              {canReorder && !searchOpen && (
                 <Pressable
                   onPress={() => setReordering(true)}
                   style={({ pressed }) => [
@@ -400,6 +445,33 @@ export default function GuidesHome() {
           )}
         </View>
       </View>
+
+      {searchOpen && (
+        <View style={styles.searchRow}>
+          <View style={[styles.searchBox, { backgroundColor: colors.surfaceAlt }]}>
+            <Icon name="magnifyingglass" size={18} color={colors.textTertiary} />
+            <TextInput
+              ref={searchInputRef}
+              value={search}
+              onChangeText={setSearch}
+              placeholder="Search guides"
+              placeholderTextColor={colors.textTertiary}
+              autoCorrect={false}
+              returnKeyType="search"
+              clearButtonMode="never"
+              style={[styles.searchInput, { color: colors.textPrimary }]}
+            />
+            {search.length > 0 && (
+              <Pressable onPress={() => setSearch('')} hitSlop={8}>
+                <Icon name="xmark.circle.fill" size={18} color={colors.textTertiary} />
+              </Pressable>
+            )}
+          </View>
+          <Pressable onPress={closeSearch} hitSlop={8}>
+            <Text style={[typography.bodyMedium, { color: colors.accent }]}>Cancel</Text>
+          </Pressable>
+        </View>
+      )}
 
       {loadingGuides ? (
         <View style={contentStyle}>
@@ -447,12 +519,24 @@ export default function GuidesHome() {
       ) : (
         <FlatList
           style={styles.container}
-          data={rows}
+          data={searching ? filteredRows : rows}
           keyExtractor={(row) => (row.type === 'header' ? `h-${row.label}` : row.guide.id)}
-          stickyHeaderIndices={stickyIndices}
+          stickyHeaderIndices={searching ? [] : stickyIndices}
+          keyboardShouldPersistTaps="handled"
           contentContainerStyle={contentStyle}
           showsVerticalScrollIndicator={false}
           renderItem={renderNormalItem}
+          ListEmptyComponent={
+            searching ? (
+              <View style={styles.searchEmpty}>
+                <Text
+                  style={[typography.body, { color: colors.textSecondary, textAlign: 'center' }]}
+                >
+                  No guides named “{search.trim()}”.
+                </Text>
+              </View>
+            ) : null
+          }
         />
       )}
 
@@ -517,6 +601,24 @@ const styles = StyleSheet.create({
     paddingBottom: spacing.md,
   },
   headerActions: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
+  searchRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.md,
+    paddingHorizontal: spacing.lg,
+    paddingBottom: spacing.md,
+  },
+  searchEmpty: { paddingTop: spacing.xxl, paddingHorizontal: spacing.md, alignItems: 'center' },
+  searchBox: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
+    paddingHorizontal: spacing.md,
+    height: 40,
+    borderRadius: radius.sm,
+  },
+  searchInput: { flex: 1, fontSize: 16, paddingVertical: 0, letterSpacing: 0 }, // letterSpacing guards vs RN#42589
   doneBtn: { paddingHorizontal: spacing.sm, height: 40, justifyContent: 'center' },
   iconBtn: {
     width: 40,
