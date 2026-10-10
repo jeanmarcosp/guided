@@ -12,7 +12,19 @@ export type ShareRow = {
   created_at: string;
 };
 
-/** Create a reusable share link for a guide and return its deep link URL. */
+/**
+ * Public URL for a share token. When EXPO_PUBLIC_SHARE_URL_BASE is set this is
+ * an https link served by workers/guide-preview, so it unfurls with a rich
+ * preview card in iMessage/WhatsApp/etc. and lands non-users on an "Open in
+ * Guided" page. Falls back to the raw deep link when unset (dev).
+ */
+export function shareUrlForToken(token: string): string {
+  const base = process.env.EXPO_PUBLIC_SHARE_URL_BASE;
+  if (base) return `${base.replace(/\/+$/, '')}/share/${token}`;
+  return Linking.createURL(`share/${token}`);
+}
+
+/** Create a reusable share link for a guide and return its shareable URL. */
 export async function createShareLink(
   guideId: string,
   role: Exclude<GuideRole, 'owner'> = 'viewer',
@@ -24,7 +36,7 @@ export async function createShareLink(
     .single();
   if (error) throw error;
   const token = (data as { token: string }).token;
-  return { token, url: Linking.createURL(`share/${token}`) };
+  return { token, url: shareUrlForToken(token) };
 }
 
 export type GuideMember = {

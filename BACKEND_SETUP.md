@@ -235,3 +235,65 @@ Verify (use a throwaway account — this is irreversible):
   cascade-delete with their owner). A guide _shared with_ the deleted account
   (owned by someone else) is unaffected — it just drops off the deleted
   account's list.
+
+## Share-link previews (rich unfurls in chat apps)
+
+Share links are now **https URLs** served by a Cloudflare Worker
+(`workers/guide-preview`), so pasting one into iMessage / WhatsApp / Slack
+unfurls a preview card — an **Apple Maps snapshot of the guide's pins** with an
+info bar (emoji, name, place count), like sharing an Apple Maps guide. Without
+MapKit credentials (step 4) it falls back to a branded gradient card. Non-users
+who tap the link land on a page with an **Open in Guided** button
+(`guided://share/<token>`); users with the app can open it from there.
+
+1. **Apply the migrations** (`0017`, `0018`):
+   ```bash
+   supabase db push
+   ```
+   Adds `share_link_preview(p_token)` — a `security definer` RPC callable by
+   `anon`, because scrapers hold no auth: the token itself is the credential.
+   It returns name/emoji/color, place count, up to 3 place names, up to 24 pin
+   coordinates for the map (`0018`), and the owner's **display name** (never
+   emails or member lists), and only resolves reusable link rows
+   (`shared_with is null`).
+2. **Deploy the worker**:
+   ```bash
+   cd workers/guide-preview
+   npm install
+   npx wrangler login     # once
+   npm run deploy         # → https://guide-preview.<your-subdomain>.workers.dev
+   ```
+3. **Point the app at it** — add the deployed URL to `.env.local`:
+   ```bash
+   EXPO_PUBLIC_SHARE_URL_BASE=https://guide-preview.<your-subdomain>.workers.dev
+   ```
+   `shareUrlForToken` (lib/api/shares.ts) then emits
+   `$SHARE_URL_BASE/share/<token>`; when unset it falls back to the raw
+   `guided://` deep link (dev). Restart Metro after changing env vars.
+4. **Apple Maps snapshot in the card** — create a **MapKit JS key** at
+   developer.apple.com → Certificates, Identifiers & Profiles → Keys → **+** →
+   check *MapKit JS*, and download the `.p8`. Then:
+   - set `"APPLE_MAPKIT_TEAM_ID"` and `"APPLE_MAPKIT_KEY_ID"` in
+     `workers/guide-preview/wrangler.jsonc` vars,
+   - store the key: `npx wrangler secret put APPLE_MAPKIT_KEY` (paste the whole
+     `.p8` PEM, including the BEGIN/END lines),
+   - redeploy: `npm run deploy`.
+   The worker signs each snapshot request itself (ES256 over the URL path —
+   same scheme as Apple's Web Snapshots docs); the free tier is 25,000
+   snapshots/day. If the snapshot fails for any reason the card silently falls
+   back to the gradient design.
+5. **Optional — Universal Links** (tapping the https link opens the app
+   directly, skipping the landing page): set `"APPLE_TEAM_ID": "XXXXXXXXXX"` in
+   `workers/guide-preview/wrangler.jsonc` vars (the worker then serves the
+   `apple-app-site-association` file), add
+   `"associatedDomains": ["applinks:guide-preview.<your-subdomain>.workers.dev"]`
+   under `ios` in `app.json`, and rebuild the dev build.
+
+Verify:
+
+- `curl https://guide-preview.<subdomain>.workers.dev/share/<token>` (create a
+  link via **Share guide** first) → HTML with `og:title` / `og:image` tags.
+  Open `…/share/<token>/og.png` in a browser → the rendered card.
+- Text the link to yourself in iMessage → it unfurls with the card.
+- A revoked or bogus token → a branded 404 ("This link isn't active"), and no
+  guide metadata is leaked.

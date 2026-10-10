@@ -1,8 +1,16 @@
 import Icon from '@/components/Icon';
-import * as Linking from 'expo-linking';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useCallback, useEffect, useState } from 'react';
-import { ActivityIndicator, Alert, Pressable, Share, StyleSheet, Text, View } from 'react-native';
+import {
+  ActivityIndicator,
+  Alert,
+  Platform,
+  Pressable,
+  Share,
+  StyleSheet,
+  Text,
+  View,
+} from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import Avatar from '@/components/Avatar';
 import {
@@ -10,6 +18,7 @@ import {
   listShares,
   resolveProfiles,
   revokeShare,
+  shareUrlForToken,
   updateShareRole,
   type ShareRow,
 } from '@/lib/api/shares';
@@ -41,7 +50,7 @@ export default function ShareGuideScreen() {
       const links = { viewer: null as string | null, editor: null as string | null };
       for (const r of rows) {
         if (r.shared_with === null && (r.role === 'viewer' || r.role === 'editor')) {
-          links[r.role] = Linking.createURL(`share/${r.token}`);
+          links[r.role] = shareUrlForToken(r.token);
         }
       }
       setLinkByRole(links);
@@ -83,9 +92,13 @@ export default function ShareGuideScreen() {
       }
       const message =
         role === 'editor'
-          ? `Help build my “${guide?.name ?? 'guide'}” on Guided: ${url}`
-          : `Check out my “${guide?.name ?? 'guide'}” on Guided: ${url}`;
-      await Share.share({ message });
+          ? `Help build my “${guide?.name ?? 'guide'}” on Guided`
+          : `Check out my “${guide?.name ?? 'guide'}” on Guided`;
+      // Pass the url separately — iMessage only renders the rich preview card
+      // when the URL isn't embedded inside a text message.
+      await Share.share(
+        Platform.OS === 'ios' ? { message, url } : { message: `${message}: ${url}` },
+      );
     } catch (e: any) {
       Alert.alert('Could not share', e?.message ?? 'Please try again.');
     } finally {
