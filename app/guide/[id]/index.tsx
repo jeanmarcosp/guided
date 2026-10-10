@@ -446,7 +446,7 @@ export default function GuideDetail() {
     } catch {
       // Fall back to no map bias; the search screen will try device location.
     }
-    router.push({
+    router.navigate({
       pathname: '/guide/[id]/search',
       params: {
         id: guide.id,
@@ -532,7 +532,7 @@ export default function GuideDetail() {
           fallbackStyle={[{ backgroundColor: colors.surface }, styles.fallbackShadow]}
         >
           <Pressable
-            onPress={() => router.push(`/guide/${guide.id}/settings`)}
+            onPress={() => router.navigate(`/guide/${guide.id}/settings`)}
             style={styles.btnInner}
             hitSlop={8}
           >
@@ -665,7 +665,7 @@ export default function GuideDetail() {
             )}
             {isOwner && (
               <Pressable
-                onPress={() => router.push(`/guide/${guide.id}/share`)}
+                onPress={() => router.navigate(`/guide/${guide.id}/share`)}
                 style={({ pressed }) => [
                   styles.iconBtn,
                   { backgroundColor: colors.fill },
@@ -678,7 +678,7 @@ export default function GuideDetail() {
             )}
             {canEdit && (
               <Pressable
-                onPress={() => router.push(`/guide/${guide.id}/layers`)}
+                onPress={() => router.navigate(`/guide/${guide.id}/layers`)}
                 style={({ pressed }) => [
                   styles.iconBtn,
                   { backgroundColor: colors.fill },

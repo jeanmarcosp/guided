@@ -184,7 +184,7 @@ export default function GuidesHome() {
           `${places.length} place${places.length === 1 ? '' : 's'} imported; ${skipped} could not be found.`,
         );
       }
-      router.push(`/guide/${guide.id}`);
+      router.navigate(`/guide/${guide.id}`);
     } catch (e: any) {
       setImporting(false);
       Alert.alert('Import failed', e?.message ?? 'Please try again.');
@@ -204,7 +204,7 @@ export default function GuidesHome() {
     if (editor.mode === 'create') {
       const guide = createGuide(draft.name || 'Untitled Guide', draft.emoji, draft.color);
       setEditor(null);
-      router.push(`/guide/${guide.id}`);
+      router.navigate(`/guide/${guide.id}`);
     } else {
       updateGuide(editor.id, draft);
       setEditor(null);
@@ -301,7 +301,7 @@ export default function GuidesHome() {
     if (item.shared) {
       return (
         <View style={styles.guideSpacer}>
-          <Pressable onPress={() => router.push(`/guide/${g.id}`)}>
+          <Pressable onPress={() => router.navigate(`/guide/${g.id}`)}>
             <GuideCard guide={g} />
           </Pressable>
         </View>
@@ -311,7 +311,7 @@ export default function GuidesHome() {
       <View style={styles.guideSpacer}>
         <SwipeActionRow
           actions={swipeActions(g)}
-          onPress={() => router.push(`/guide/${g.id}`)}
+          onPress={() => router.navigate(`/guide/${g.id}`)}
           onLongPress={() => handleEdit(g)}
         >
           <GuideCard guide={g} />
@@ -322,7 +322,7 @@ export default function GuidesHome() {
 
   // Reorder-mode row (grip drag, no swipe).
   const renderDragRow = ({ item }: { item: Guide }) => (
-    <GuideDragRow guide={item} onPress={() => router.push(`/guide/${item.id}`)} />
+    <GuideDragRow guide={item} onPress={() => router.navigate(`/guide/${item.id}`)} />
   );
 
   // Reorder mode: one nested list per group inside a sticky-header scroll view.
@@ -394,7 +394,7 @@ export default function GuidesHome() {
           ) : (
             <>
               <Pressable
-                onPress={() => router.push('/settings')}
+                onPress={() => router.navigate('/settings')}
                 style={({ pressed }) => [
                   styles.iconBtn,
                   { backgroundColor: colors.surface, borderColor: colors.border },
