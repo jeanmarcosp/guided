@@ -161,6 +161,8 @@ ${smartBanner}<style>
     font-size: 17px; font-weight: 600; text-decoration: none;
   }
   .hint { margin-top: 16px; font-size: 13px; color: rgba(255,255,255,.4); }
+  .alt { margin-top: 20px; font-size: 14px; }
+  .alt a { color: rgba(255,255,255,.75); text-decoration: underline; }
   .brand { margin-top: 48px; font-size: 14px; font-weight: 600; color: rgba(255,255,255,.5); }
 </style>
 </head>
@@ -169,34 +171,50 @@ ${smartBanner}<style>
     <div class="emoji">${esc(p.emoji)}</div>
     <h1>${esc(p.name)}</h1>
     <p class="sub">${esc(description)}</p>
-    <a class="open" id="open" href="${deepLink}">Open in Guided</a>
+    <a class="open" id="open" href="${storeUrl ?? deepLink}">${
+      storeUrl ? 'Get Guided on the App Store' : 'Open in Guided'
+    }</a>
     <p class="hint" id="hint">${
       storeUrl
-        ? 'Don’t have the app? You’ll be taken to the App Store.'
+        ? 'Taking you to the App Store…'
         : 'You’ll need the Guided app on your iPhone to open this guide.'
     }</p>
+    ${
+      storeUrl
+        ? `<p class="alt"><a id="openapp" href="${deepLink}">Already have Guided? Open it</a></p>`
+        : ''
+    }
     <p class="brand">🧭 Guided</p>
   </main>
 <script>
-  // Try the app first; if this page is still visible shortly after, the app
-  // isn't installed — fall back to the App Store (or explain, pre-launch).
+  // A universal link hands off to the app BEFORE this page can render, so if
+  // this is running at all the app almost certainly isn't installed — go
+  // straight to the App Store. Crucially we do NOT navigate to the custom
+  // scheme: with no app registered for it, Safari throws "cannot open the page
+  // because the address is invalid", and that dialog is browser-level — it
+  // can't be caught or suppressed from here.
   (function () {
-    var deepLink = ${JSON.stringify(deepLink)};
     var storeUrl = ${JSON.stringify(storeUrl)};
-    document.getElementById('open').addEventListener('click', function (e) {
-      e.preventDefault();
-      var timer = setTimeout(function () {
-        if (document.visibilityState !== 'visible') return;
-        if (storeUrl) {
-          location.href = storeUrl;
-        } else {
-          document.getElementById('hint').textContent =
-            'Guided doesn’t seem to be installed on this device — it’s coming to the App Store soon.';
-        }
-      }, 1800);
-      addEventListener('pagehide', function () { clearTimeout(timer); }, { once: true });
-      location.href = deepLink;
-    });
+    var ua = navigator.userAgent || '';
+    var iOS =
+      /iPad|iPhone|iPod/.test(ua) ||
+      (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+    var timer;
+
+    // Only someone who knows they have the app taps this, so the scheme is
+    // safe here — and tapping it cancels the pending App Store hop.
+    var openApp = document.getElementById('openapp');
+    if (openApp) openApp.addEventListener('click', function () { clearTimeout(timer); });
+
+    // ?stay=1 renders the card without redirecting, for checking the page.
+    if (!storeUrl || !iOS || location.search.indexOf('stay') !== -1) return;
+
+    timer = setTimeout(function () {
+      // If the app did take over (e.g. via the Smart App Banner), stand down.
+      if (document.visibilityState !== 'visible') return;
+      location.replace(storeUrl);
+    }, 1200);
+    addEventListener('pagehide', function () { clearTimeout(timer); }, { once: true });
   })();
 </script>
 </body>
