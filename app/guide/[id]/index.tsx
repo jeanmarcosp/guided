@@ -1,4 +1,4 @@
-import BottomSheet, { BottomSheetSectionList } from '@gorhom/bottom-sheet';
+import BottomSheet, { BottomSheetSectionList, BottomSheetTextInput } from '@gorhom/bottom-sheet';
 import Icon from '@/components/Icon';
 import * as Haptics from 'expo-haptics';
 import * as Location from 'expo-location';
@@ -11,7 +11,6 @@ import {
   Pressable,
   StyleSheet,
   Text,
-  TextInput,
   useWindowDimensions,
   View,
 } from 'react-native';
@@ -81,7 +80,6 @@ export default function GuideDetail() {
 
   const mapRef = useRef<GuidedMapRef>(null);
   const sheetRef = useRef<BottomSheet>(null);
-  const searchInputRef = useRef<TextInput>(null);
   const mapReady = useRef(false);
   const prevCount = useRef(guide?.places.length ?? 0);
   const [showSearchArea, setShowSearchArea] = useState(false);
@@ -478,13 +476,20 @@ export default function GuideDetail() {
     // Open to the medium detent (not full height) so the field and some results
     // are visible while the map stays in view.
     sheetRef.current?.snapToIndex(1);
-    setTimeout(() => searchInputRef.current?.focus(), 250);
   }
 
   function closePlaceSearch() {
     Keyboard.dismiss();
+    sheetRef.current?.snapToIndex(1);
     setSearch('');
     setSearchOpen(false);
+  }
+
+  // Search key: drop the keyboard and settle back to the medium detent,
+  // keeping the query and its matches on screen.
+  function submitPlaceSearch() {
+    Keyboard.dismiss();
+    sheetRef.current?.snapToIndex(1);
   }
 
   // Guide was deleted while open.
@@ -633,11 +638,11 @@ export default function GuideDetail() {
         index={1}
         snapPoints={snapPoints}
         enableDynamicSizing={false}
-        // Keyboard: rise to the tallest detent so the field and results clear it,
-        // then drop back to the detent we were at when it hides (the Search key,
-        // Cancel, or a swipe-down all route through the same blur).
+        // Rise to the tallest detent while the keyboard is up. Coming back down is
+        // ours to do: gorhom's "restore" resolves to detents[currentIndex], which
+        // extend has already moved to the top detent, so it restores to no-op.
         keyboardBehavior="extend"
-        keyboardBlurBehavior="restore"
+        keyboardBlurBehavior="none"
         animatedPosition={sheetTop}
         style={styles.sheetFloat}
         backgroundComponent={({ style }) => (
@@ -734,15 +739,15 @@ export default function GuideDetail() {
             <View style={styles.searchRow}>
               <View style={[styles.searchBox, { backgroundColor: colors.fill }]}>
                 <Icon name="magnifyingglass" size={18} color={colors.textTertiary} />
-                <TextInput
-                  ref={searchInputRef}
+                <BottomSheetTextInput
+                  autoFocus
                   value={search}
                   onChangeText={setSearch}
                   placeholder="Search this guide"
                   placeholderTextColor={colors.textTertiary}
                   autoCorrect={false}
                   returnKeyType="search"
-                  onSubmitEditing={() => Keyboard.dismiss()}
+                  onSubmitEditing={submitPlaceSearch}
                   clearButtonMode="never"
                   style={[styles.searchInput, { color: colors.textPrimary }]}
                 />
