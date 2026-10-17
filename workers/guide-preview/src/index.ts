@@ -25,6 +25,12 @@ export interface Env {
   APPLE_MAPKIT_KEY?: string;
   /** Override for tests only; defaults to Apple's snapshot host. */
   SNAPSHOT_BASE_URL?: string;
+  /**
+   * Numeric App Store ID (from the App Store Connect app record). Enables the
+   * Safari Smart App Banner and the App Store fallback when the app isn't
+   * installed. Until set, the landing page shows a "coming soon" note instead.
+   */
+  APP_STORE_ID?: string;
 }
 
 type Preview = {
@@ -101,7 +107,15 @@ function sharePage(p: Preview, token: string, url: URL, env: Env): Response {
   const title = `${p.emoji} ${p.name}`.trim();
   const description = describe(p);
   const deepLink = `${env.APP_SCHEME}://share/${token}`;
+  const storeUrl = env.APP_STORE_ID ? `https://apps.apple.com/app/id${env.APP_STORE_ID}` : null;
   const color = safeColor(p.color);
+
+  // Safari's native open-or-get banner: shows OPEN (app installed, passes the
+  // share URL through) or GET (App Store). Only renderable once the app has an
+  // App Store Connect record.
+  const smartBanner = env.APP_STORE_ID
+    ? `<meta name="apple-itunes-app" content="app-id=${env.APP_STORE_ID}, app-argument=${canonical}" />\n`
+    : '';
 
   const html = `<!doctype html>
 <html lang="en">
@@ -124,7 +138,7 @@ function sharePage(p: Preview, token: string, url: URL, env: Env): Response {
 <meta name="twitter:description" content="${esc(description)}" />
 <meta name="twitter:image" content="${canonical}/og.png" />
 <meta name="theme-color" content="${color}" />
-<style>
+${smartBanner}<style>
   :root { color-scheme: dark; }
   * { margin: 0; box-sizing: border-box; }
   body {
@@ -155,10 +169,36 @@ function sharePage(p: Preview, token: string, url: URL, env: Env): Response {
     <div class="emoji">${esc(p.emoji)}</div>
     <h1>${esc(p.name)}</h1>
     <p class="sub">${esc(description)}</p>
-    <a class="open" href="${deepLink}">Open in Guided</a>
-    <p class="hint">You’ll need the Guided app on your iPhone to open this guide.</p>
+    <a class="open" id="open" href="${deepLink}">Open in Guided</a>
+    <p class="hint" id="hint">${
+      storeUrl
+        ? 'Don’t have the app? You’ll be taken to the App Store.'
+        : 'You’ll need the Guided app on your iPhone to open this guide.'
+    }</p>
     <p class="brand">🧭 Guided</p>
   </main>
+<script>
+  // Try the app first; if this page is still visible shortly after, the app
+  // isn't installed — fall back to the App Store (or explain, pre-launch).
+  (function () {
+    var deepLink = ${JSON.stringify(deepLink)};
+    var storeUrl = ${JSON.stringify(storeUrl)};
+    document.getElementById('open').addEventListener('click', function (e) {
+      e.preventDefault();
+      var timer = setTimeout(function () {
+        if (document.visibilityState !== 'visible') return;
+        if (storeUrl) {
+          location.href = storeUrl;
+        } else {
+          document.getElementById('hint').textContent =
+            'Guided doesn’t seem to be installed on this device — it’s coming to the App Store soon.';
+        }
+      }, 1800);
+      addEventListener('pagehide', function () { clearTimeout(timer); }, { once: true });
+      location.href = deepLink;
+    });
+  })();
+</script>
 </body>
 </html>`;
 

@@ -29,5 +29,9 @@
     // ...and store the .p8 file's contents as a secret (never in this file):
     //   npx wrangler secret put APPLE_MAPKIT_KEY   (paste the whole PEM)
     // Without these the card falls back to the gradient design.
+    //
+    // Numeric App Store ID — enables the Safari Smart App Banner and the
+    // "no app → App Store" fallback on the landing page.
+    "APP_STORE_ID": "6805946279"
   },
 }
