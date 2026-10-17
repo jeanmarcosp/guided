@@ -1,4 +1,4 @@
-import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
+import Icon from '@/components/Icon';
 import { useEffect, useState } from 'react';
 import {
   KeyboardAvoidingView,
@@ -25,6 +25,8 @@ type Props = {
   onTogglePin?: () => void;
   onSubmit: (draft: GuideDraft) => void;
   onDelete?: () => void;
+  /** Create mode only: offer importing an Apple Maps guide instead. */
+  onImport?: () => void;
   onClose: () => void;
 };
 
@@ -36,6 +38,7 @@ export default function GuideEditor({
   onTogglePin,
   onSubmit,
   onDelete,
+  onImport,
   onClose,
 }: Props) {
   const colors = useColors();
@@ -153,15 +156,15 @@ export default function GuideEditor({
                 pressed && { opacity: 0.6 },
               ]}
             >
-              <MaterialCommunityIcons
-                name={pinned ? 'pin-off' : 'pin'}
+              <Icon
+                name={pinned ? 'pin.slash.fill' : 'pin.fill'}
                 size={18}
                 color={pinned ? colors.accent : colors.textSecondary}
               />
               <Text style={[typography.bodyMedium, { color: colors.textPrimary, flex: 1 }]}>
                 {pinned ? 'Pinned to top' : 'Pin to top'}
               </Text>
-              {pinned && <Ionicons name="checkmark" size={18} color={colors.accent} />}
+              {pinned && <Icon name="checkmark" size={18} color={colors.accent} />}
             </Pressable>
           )}
 
@@ -170,8 +173,21 @@ export default function GuideEditor({
               onPress={onDelete}
               style={({ pressed }) => [styles.deleteBtn, pressed && { opacity: 0.6 }]}
             >
-              <Ionicons name="trash-outline" size={18} color={colors.danger} />
+              <Icon name="trash" size={18} color={colors.danger} />
               <Text style={[typography.bodyMedium, { color: colors.danger }]}>Delete Guide</Text>
+            </Pressable>
+          )}
+
+          {mode === 'create' && onImport && (
+            <Pressable
+              onPress={onImport}
+              hitSlop={8}
+              style={({ pressed }) => [styles.importRow, pressed && { opacity: 0.6 }]}
+            >
+              <Icon name="square.and.arrow.down" size={16} color={colors.accent} />
+              <Text style={[typography.bodyMedium, { color: colors.accent }]}>
+                Import from Apple Maps instead
+              </Text>
             </Pressable>
           )}
         </Animated.View>
@@ -228,6 +244,14 @@ const styles = StyleSheet.create({
     marginTop: spacing.xs,
   },
   deleteBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: spacing.sm,
+    paddingVertical: spacing.md,
+    marginTop: spacing.xs,
+  },
+  importRow: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',

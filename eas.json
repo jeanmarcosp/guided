@@ -12,10 +12,20 @@
       }
     },
     "preview": {
-      "distribution": "internal"
+      "distribution": "internal",
+      "env": {
+        "EXPO_PUBLIC_SUPABASE_URL": "https://qdfpzmbxnmofpziztkxc.supabase.co",
+        "EXPO_PUBLIC_SUPABASE_ANON_KEY": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InFkZnB6bWJ4bm1vZnB6aXp0a3hjIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODY1NTg4NzEsImV4cCI6MjEwMjEzNDg3MX0._wa9y1GfZ9B4QY0lAGvFwJjZegt2bRsI7yus-M8adCw",
+        "EXPO_PUBLIC_SHARE_URL_BASE": "https://guidedmaps.com"
+      }
     },
     "production": {
-      "autoIncrement": true
+      "autoIncrement": true,
+      "env": {
+        "EXPO_PUBLIC_SUPABASE_URL": "https://qdfpzmbxnmofpziztkxc.supabase.co",
+        "EXPO_PUBLIC_SUPABASE_ANON_KEY": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InFkZnB6bWJ4bm1vZnB6aXp0a3hjIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODY1NTg4NzEsImV4cCI6MjEwMjEzNDg3MX0._wa9y1GfZ9B4QY0lAGvFwJjZegt2bRsI7yus-M8adCw",
+        "EXPO_PUBLIC_SHARE_URL_BASE": "https://guidedmaps.com"
+      }
     }
   },
   "submit": {

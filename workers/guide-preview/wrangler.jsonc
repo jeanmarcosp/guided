@@ -1,0 +1,33 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "guide-preview",
+  "main": "src/index.ts",
+  "compatibility_date": "2026-10-01",
+  "observability": { "enabled": true },
+  // Share links live on the root domain so previews show a clean
+  // "guidedmaps.com". Cloudflare provisions the DNS record + TLS cert
+  // automatically on deploy; the workers.dev URL keeps working too.
+  "routes": [{ "pattern": "guidedmaps.com", "custom_domain": true }],
+  // Keep the workers.dev URL alive — share links sent before the custom
+  // domain existed point at it.
+  "workers_dev": true,
+  "vars": {
+    // The publishable (anon) key is safe to commit — it ships inside the app
+    // bundle too. RLS + the security-definer RPC are the real guard.
+    "SUPABASE_URL": "https://qdfpzmbxnmofpziztkxc.supabase.co",
+    "SUPABASE_ANON_KEY": "sb_publishable_vHFXxoiLSpLsY7UYFjGMQQ_WLKaffkJ",
+    "APP_SCHEME": "guided",
+    // Optional — set to your Apple Team ID to serve the AASA file for
+    // Universal Links (so tapping a share link opens the app directly):
+    "APPLE_TEAM_ID": "WVSM8S9725",
+    //
+    // Apple Maps snapshot in the preview card (og image). Create a MapKit JS
+    // key at developer.apple.com → Certificates, Identifiers & Profiles →
+    // Keys → + → MapKit JS, then set:
+    "APPLE_MAPKIT_TEAM_ID": "WVSM8S9725",
+    "APPLE_MAPKIT_KEY_ID": "XK2XXC6M59",
+    // ...and store the .p8 file's contents as a secret (never in this file):
+    //   npx wrangler secret put APPLE_MAPKIT_KEY   (paste the whole PEM)
+    // Without these the card falls back to the gradient design.
+  },
+}

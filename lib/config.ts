@@ -1,10 +1,9 @@
 /**
- * Sign in with Apple is deferred until an Apple Developer account is available.
- * To re-enable:
- *   1. Set this to true.
- *   2. In app.json add `"expo-apple-authentication"` to plugins and
- *      `"usesAppleSignIn": true` under `ios`.
- *   3. Configure the Apple provider in Supabase (Authentication → Providers).
- *   4. Rebuild the dev client (`npx expo run:ios`).
+ * Sign in with Apple. Requires:
+ *   - `expo-apple-authentication` in app.json plugins and
+ *     `"usesAppleSignIn": true` under `ios` (adds the entitlement via CNG).
+ *   - The Apple provider enabled in Supabase with the app's bundle id as the
+ *     client id (supabase/config.toml → `supabase config push`).
+ *   - A dev-client rebuild after the entitlement change (`npx expo run:ios`).
  */
-export const APPLE_SIGN_IN_ENABLED = false;
+export const APPLE_SIGN_IN_ENABLED = true;

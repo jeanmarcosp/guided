@@ -5,11 +5,11 @@ Recipe for exercising changes in the real app. Expo dev-client + Metro; no Expo 
 ## Launch
 
 - Metro usually already runs on port 8081 (check `lsof -iTCP:8081 -sTCP:LISTEN`; its cwd should be this repo). If not: `npm start`.
-- Dev client is installed on the booted simulators as `com.anonymous.guided`. Find booted devices: `xcrun simctl list devices booted`. Multiple sims may be booted — pick one UDID and use it consistently (`pgrep Guided` matches ALL sims' processes; get the right pid via `xcrun simctl spawn <udid> launchctl list | grep guided`).
-- Launch: `xcrun simctl terminate <udid> com.anonymous.guided; xcrun simctl launch <udid> com.anonymous.guided` then wait ~10s for the JS bundle.
+- Dev client is installed on the booted simulators as `com.guidedmaps.app`. Find booted devices: `xcrun simctl list devices booted`. Multiple sims may be booted — pick one UDID and use it consistently (`pgrep Guided` matches ALL sims' processes; get the right pid via `xcrun simctl spawn <udid> launchctl list | grep guided`).
+- Launch: `xcrun simctl terminate <udid> com.guidedmaps.app; xcrun simctl launch <udid> com.guidedmaps.app` then wait ~10s for the JS bundle.
 - Navigate via deep link (expo-router, scheme `guided`): `xcrun simctl openurl <udid> "guided://guide/<guideId>"`. iOS sometimes shows an "Open in Guided?" confirm dialog — tap Open via idb (below).
 - Guide ids / place data live in AsyncStorage:
-  `$(xcrun simctl get_app_container <udid> com.anonymous.guided data)/Library/Application Support/com.anonymous.guided/RCTAsyncLocalStorage_V1/` — key `guide-maker-storage-v1`; large values are in files named md5(key). Read-only inspection is fine; don't mutate (guides sync to Supabase).
+  `$(xcrun simctl get_app_container <udid> com.guidedmaps.app data)/Library/Application Support/com.guidedmaps.app/RCTAsyncLocalStorage_V1/` — key `guide-maker-storage-v1`; large values are in files named md5(key). Read-only inspection is fine; don't mutate (guides sync to Supabase).
 
 ## Drive (taps/swipes)
 
@@ -26,4 +26,4 @@ Recipe for exercising changes in the real app. Expo dev-client + Metro; no Expo 
 - Crash reports land in `~/Library/Logs/DiagnosticReports/Guided-*.ips` (JSON; first line meta, rest body).
 - lldb attach works on the dev build (breakpoints in Guided.debug.dylib symbols). NEVER SIGKILL lldb while breakpoints are set — orphaned `brk` patches SIGTRAP-crash the app and can wedge the simulator (fix: `xcrun simctl shutdown <udid> && boot`, app data survives).
 - JS console.log does NOT reach os_log; Metro's stdout runs in the user's terminal. Prefer screenshots + lldb for runtime evidence.
-- react-native-maps mutation rules: see comments in `components/GuideMap.tsx` (fixed marker pool; never add/remove map children on zoom; never use Marker `opacity` — it sets the native alpha MapKit also animates, and gets stuck part-way; hide a marker by drawing nothing inside it, keeping its child view `collapsable={false}` and its frame constant).
+- The map is a custom native module (`modules/guided-map`, MKMapView + native MKClusterAnnotation clustering) — not react-native-maps. Pins/callouts/cluster bubbles are native views, invisible to the RN element tree; verify them via screenshots. Changing Swift in `modules/guided-map/ios/` requires a dev-client rebuild (`npx expo run:ios`), not just a Metro reload.

@@ -2,11 +2,17 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { create } from 'zustand';
 import { createJSONStorage, persist } from 'zustand/middleware';
 import { uid } from '@/lib/id';
-import { assignLayers, categorizeLayer, makeCustomLayer, makeLayerFromKind } from '@/lib/layers';
+import {
+  assignLayers,
+  categorizeLayer,
+  makeCustomLayer,
+  makeLayerFromKind,
+  normalizeLayerIcon,
+} from '@/lib/layers';
 import type { Guide, Layer, Place } from '@/lib/types';
 import { GUIDE_COLORS, GUIDE_EMOJIS } from '@/theme/tokens';
 
-type LayerPatch = Partial<Pick<Layer, 'name' | 'color' | 'emoji'>>;
+type LayerPatch = Partial<Pick<Layer, 'name' | 'color' | 'icon'>>;
 
 type GuidesState = {
   guides: Guide[];
@@ -250,7 +256,7 @@ export const useGuides = create<GuidesState>()(
     {
       name: 'guide-maker-storage-v1',
       storage: createJSONStorage(() => AsyncStorage),
-      version: 2,
+      version: 3,
       // Migrate pre-layers guides: build layers from category grouping and
       // assign each place a layerId; carry over old hidden-layer state.
       migrate: (persisted: any, version: number) => {
@@ -261,6 +267,16 @@ export const useGuides = create<GuidesState>()(
             const { hiddenLayers, ...rest } = g;
             return { ...rest, layers, places };
           });
+        }
+        // v3: layers carry an SF Symbol `icon` instead of an emoji.
+        if (persisted && version < 3) {
+          persisted.guides = (persisted.guides ?? []).map((g: any) => ({
+            ...g,
+            layers: (g.layers ?? []).map((l: any) => {
+              const { emoji, ...rest } = l;
+              return { ...rest, icon: normalizeLayerIcon(l.icon ?? emoji) };
+            }),
+          }));
         }
         return persisted;
       },

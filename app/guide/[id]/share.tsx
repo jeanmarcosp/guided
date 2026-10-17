@@ -1,8 +1,16 @@
-import { Ionicons } from '@expo/vector-icons';
-import * as Linking from 'expo-linking';
+import Icon from '@/components/Icon';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useCallback, useEffect, useState } from 'react';
-import { ActivityIndicator, Alert, Pressable, Share, StyleSheet, Text, View } from 'react-native';
+import {
+  ActivityIndicator,
+  Alert,
+  Platform,
+  Pressable,
+  Share,
+  StyleSheet,
+  Text,
+  View,
+} from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import Avatar from '@/components/Avatar';
 import {
@@ -10,6 +18,7 @@ import {
   listShares,
   resolveProfiles,
   revokeShare,
+  shareUrlForToken,
   updateShareRole,
   type ShareRow,
 } from '@/lib/api/shares';
@@ -41,7 +50,7 @@ export default function ShareGuideScreen() {
       const links = { viewer: null as string | null, editor: null as string | null };
       for (const r of rows) {
         if (r.shared_with === null && (r.role === 'viewer' || r.role === 'editor')) {
-          links[r.role] = Linking.createURL(`share/${r.token}`);
+          links[r.role] = shareUrlForToken(r.token);
         }
       }
       setLinkByRole(links);
@@ -83,9 +92,13 @@ export default function ShareGuideScreen() {
       }
       const message =
         role === 'editor'
-          ? `Help build my “${guide?.name ?? 'guide'}” on Guided: ${url}`
-          : `Check out my “${guide?.name ?? 'guide'}” on Guided: ${url}`;
-      await Share.share({ message });
+          ? `Help build my “${guide?.name ?? 'guide'}” on Guided`
+          : `Check out my “${guide?.name ?? 'guide'}” on Guided`;
+      // Pass the url separately — iMessage only renders the rich preview card
+      // when the URL isn't embedded inside a text message.
+      await Share.share(
+        Platform.OS === 'ios' ? { message, url } : { message: `${message}: ${url}` },
+      );
     } catch (e: any) {
       Alert.alert('Could not share', e?.message ?? 'Please try again.');
     } finally {
@@ -140,7 +153,7 @@ export default function ShareGuideScreen() {
       <View style={styles.header}>
         <Text style={[typography.title, { color: colors.textPrimary }]}>Share guide</Text>
         <Pressable onPress={() => router.back()} hitSlop={10}>
-          <Ionicons name="close" size={26} color={colors.textSecondary} />
+          <Icon name="xmark" size={26} color={colors.textSecondary} />
         </Pressable>
       </View>
 
@@ -184,7 +197,7 @@ export default function ShareGuideScreen() {
           <ActivityIndicator color="#fff" />
         ) : (
           <>
-            <Ionicons name="link" size={18} color="#fff" />
+            <Icon name="link" size={18} color="#fff" />
             <Text style={[typography.bodyMedium, { color: '#fff' }]}>
               {linkByRole[role] ? 'Share link' : 'Create & share link'}
             </Text>
@@ -225,7 +238,7 @@ export default function ShareGuideScreen() {
               <Text style={[typography.caption, { color: colors.textSecondary }]}>
                 {m.role === 'editor' ? 'Editor' : 'Viewer'}
               </Text>
-              <Ionicons name="chevron-down" size={14} color={colors.textTertiary} />
+              <Icon name="chevron.down" size={14} color={colors.textTertiary} />
             </Pressable>
           </View>
         ))

@@ -43,3 +43,10 @@ yarn-error.*
 # Supabase CLI's local cache — link metadata, DB pooler host, org id, version
 # pins. Local-machine state, not project config; no reason to publish it.
 supabase/.temp/
+
+# Cloudflare worker local state
+.wrangler/
+
+.dev.vars*
+!.dev.vars.example
+!.env.example

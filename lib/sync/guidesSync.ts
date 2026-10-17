@@ -71,7 +71,7 @@ function layerSyncEqual(a: Layer, b: Layer): boolean {
   return (
     a.name === b.name &&
     a.color === b.color &&
-    a.emoji === b.emoji &&
+    a.icon === b.icon &&
     (a.kind ?? null) === (b.kind ?? null)
   );
 }

@@ -1,4 +1,5 @@
 import { supabase } from '@/lib/supabase';
+import { legacyEmojiForIcon } from '@/lib/layers';
 import { resolveProfiles } from '@/lib/api/shares';
 import type { Guide, GuideAccessMember, GuideRole, Layer, Place } from '@/lib/types';
 import { guideRowsToGuide, type GuideRow, type LayerRow, type PlaceRow } from '@/lib/api/mappers';
@@ -124,6 +125,7 @@ export async function insertPlaceRemote(
     longitude: place.longitude,
     category: place.category ?? null,
     added_by: place.addedBy ?? userId,
+    apple_place_id: place.applePlaceId ?? null,
   });
   if (error) {
     if (error.code === '23505') return; // coordinate/id dedupe: already present
@@ -142,6 +144,7 @@ export async function updatePlaceRemote(place: Place): Promise<void> {
       latitude: place.latitude,
       longitude: place.longitude,
       category: place.category ?? null,
+      apple_place_id: place.applePlaceId ?? null,
     })
     .eq('id', place.id);
   if (error) throw error;
@@ -166,7 +169,9 @@ export async function upsertLayerRemote(
     guide_id: guideId,
     name: layer.name,
     color: layer.color,
-    emoji: layer.emoji,
+    icon: layer.icon,
+    // Transition: old clients still render the emoji column.
+    emoji: legacyEmojiForIcon(layer.icon),
     kind: layer.kind ?? null,
     sort_order: sortOrder,
   });
@@ -224,7 +229,9 @@ export async function pushGuide(guide: Guide, ownerId: string): Promise<void> {
     guide_id: guide.id,
     name: l.name,
     color: l.color,
-    emoji: l.emoji,
+    icon: l.icon,
+    // Transition: old clients still render the emoji column.
+    emoji: legacyEmojiForIcon(l.icon),
     kind: l.kind ?? null,
     sort_order: i,
   }));
@@ -248,6 +255,7 @@ export async function pushGuide(guide: Guide, ownerId: string): Promise<void> {
     longitude: p.longitude,
     category: p.category ?? null,
     added_by: p.addedBy ?? ownerId,
+    apple_place_id: p.applePlaceId ?? null,
   }));
   if (placeRows.length > 0) {
     const { error } = await supabase.from('places').upsert(placeRows);

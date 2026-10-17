@@ -13,7 +13,9 @@
       "buildNumber": "1",
       "infoPlist": {
         "ITSAppUsesNonExemptEncryption": false
-      }
+      },
+      "usesAppleSignIn": true,
+      "associatedDomains": ["applinks:guidedmaps.com"]
     },
     "android": {
       "adaptiveIcon": {
@@ -63,7 +65,9 @@
           "resizeMode": "contain",
           "backgroundColor": "#132A13"
         }
-      ]
+      ],
+      "expo-apple-authentication",
+      "expo-share-intent"
     ],
     "extra": {
       "router": {},

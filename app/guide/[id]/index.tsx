@@ -1,22 +1,42 @@
 import BottomSheet, { BottomSheetSectionList } from '@gorhom/bottom-sheet';
-import { Ionicons } from '@expo/vector-icons';
+import Icon from '@/components/Icon';
 import * as Haptics from 'expo-haptics';
 import * as Location from 'expo-location';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Alert, Pressable, StyleSheet, Text, useWindowDimensions, View } from 'react-native';
-import { MenuView, type MenuAction } from '@react-native-menu/menu';
-import Animated, { useAnimatedStyle, useSharedValue } from 'react-native-reanimated';
-import type MapView from 'react-native-maps';
-import { type Details, type Region } from 'react-native-maps';
+import {
+  ActionSheetIOS,
+  Alert,
+  Keyboard,
+  Pressable,
+  StyleSheet,
+  Text,
+  TextInput,
+  useWindowDimensions,
+  View,
+} from 'react-native';
+import Animated, {
+  Extrapolation,
+  interpolate,
+  useAnimatedStyle,
+  useSharedValue,
+} from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import type { GuidedMapRef, Region } from '@/modules/guided-map';
+import GlassSurface from '@/components/GlassSurface';
 import GuideMap from '@/components/GuideMap';
+import LayerIcon from '@/components/LayerIcon';
 import PlaceRow from '@/components/PlaceRow';
 import { openPlaceInAppleMaps } from '@/lib/maps';
 import type { Layer, Place } from '@/lib/types';
 import { useGuides } from '@/store/guides';
 import { useVisits } from '@/store/visits';
 import { radius, spacing, typography, useColors } from '@/theme/tokens';
+
+/** Matches a saved place by name. */
+function placeMatches(p: Place, q: string): boolean {
+  return p.name.toLowerCase().includes(q);
+}
 
 const DEFAULT_REGION: Region = {
   latitude: 37.7749,
@@ -26,7 +46,13 @@ const DEFAULT_REGION: Region = {
 };
 
 const RECENTER_SIZE = 44;
-const CONTROLS_HEIGHT = RECENTER_SIZE * 4 + 8 * 3; // zoom in/out + locate + fit-all, stacked
+// Zoom capsule (2 buttons merged, Apple Maps-style) + locate + fit-all circles.
+const CONTROLS_HEIGHT = RECENTER_SIZE * 4 + 8 * 2;
+
+// Floating-card corner radius — concentric with the device's display corners
+// (≈ display radius minus the 8pt margin). Glass background AND content clips
+// share it so nothing pokes past the curve.
+const CARD_RADIUS = 52;
 
 // The sheet opens at snapPoints[1] ('45%'). gorhom lays the scroll content out
 // against the tallest snap (90%), so to center the empty message within the
@@ -53,14 +79,17 @@ export default function GuideDetail() {
   const visited = useVisits((s) => s.visited);
   const toggleVisited = useVisits((s) => s.toggle);
 
-  const mapRef = useRef<MapView>(null);
+  const mapRef = useRef<GuidedMapRef>(null);
   const sheetRef = useRef<BottomSheet>(null);
+  const searchInputRef = useRef<TextInput>(null);
   const mapReady = useRef(false);
   const prevCount = useRef(guide?.places.length ?? 0);
-  const programmaticMove = useRef(false); // a camera move we initiated
-  const suppressUntil = useRef(Date.now() + 1000); // swallow trailing settle events
   const [showSearchArea, setShowSearchArea] = useState(false);
   const [sheetHeaderHeight, setSheetHeaderHeight] = useState(0);
+  const [searchOpen, setSearchOpen] = useState(false);
+  const [search, setSearch] = useState('');
+  const query = search.trim().toLowerCase();
+  const searching = query.length > 0;
 
   // Height of the list area visible at the default (45%) snap, so the empty-state
   // message centers within what the user actually sees on first open.
@@ -69,8 +98,12 @@ export default function GuideDetail() {
     windowHeight * DEFAULT_SNAP_FRACTION - SHEET_HANDLE_HEIGHT - sheetHeaderHeight,
   );
 
-  // Peek (title bar only, full map) · medium · large — like Apple Maps.
-  const snapPoints = useMemo(() => [120, '45%', '90%'], []);
+  // Peek (floating title pill, full map) · medium · large — like Apple Maps.
+  // The peek snap includes the pill's floating gap: visible pill (88) + gap.
+  // Concentric with the device: the gap matches the side margins, and the home
+  // indicator overlays the card (exactly how Apple's floating sheets sit).
+  const pillGap = spacing.sm;
+  const snapPoints = useMemo(() => [88 + pillGap, '45%', '90%'], [pillGap]);
   const places = useMemo(() => guide?.places ?? [], [guide?.places]);
   const layers = useMemo(() => guide?.layers ?? [], [guide?.layers]);
 
@@ -97,16 +130,19 @@ export default function GuideDetail() {
     [layers],
   );
 
-  const layerEmojis = useMemo(
-    () => Object.fromEntries(layers.map((l) => [l.id, l.emoji])),
-    [layers],
-  );
+  const layerIcons = useMemo(() => Object.fromEntries(layers.map((l) => [l.id, l.icon])), [layers]);
 
   // Places whose layer isn't hidden — what the map actually shows.
   const visiblePlaces = useMemo(() => {
     const hiddenIds = new Set(layers.filter((l) => l.hidden).map((l) => l.id));
     return places.filter((p) => !hiddenIds.has(p.layerId ?? ''));
   }, [places, layers]);
+
+  // When searching, narrow the pins to matches; otherwise show every visible pin.
+  const mapPlaces = useMemo(
+    () => (searching ? visiblePlaces.filter((p) => placeMatches(p, query)) : visiblePlaces),
+    [searching, query, visiblePlaces],
+  );
 
   // One section per layer, in the guide's layer order. A collapsed layer keeps
   // its header but shows no rows (collapse is list-only; hide affects pins).
@@ -118,11 +154,21 @@ export default function GuideDetail() {
       arr.push(p);
       byLayer.set(key, arr);
     }
+    // While searching, show matches across every layer (even collapsed ones) and
+    // drop layers with no match. Otherwise respect each layer's collapsed state.
+    if (searching) {
+      return layers
+        .map((layer) => {
+          const matches = (byLayer.get(layer.id) ?? []).filter((p) => placeMatches(p, query));
+          return { layer, count: matches.length, data: matches };
+        })
+        .filter((s) => s.count > 0);
+    }
     return layers.map((layer) => {
       const all = byLayer.get(layer.id) ?? [];
       return { layer, count: all.length, data: layer.collapsed ? [] : all };
     });
-  }, [places, layers]);
+  }, [places, layers, searching, query]);
 
   // Tracks the top edge of the bottom sheet so the map controls ride above it.
   const sheetTop = useSharedValue(0);
@@ -130,25 +176,56 @@ export default function GuideDetail() {
     transform: [{ translateY: sheetTop.value - CONTROLS_HEIGHT - spacing.md }],
   }));
 
+  // iOS 26 Maps-style floating card: the glass background floats a constant
+  // gap above the screen bottom at EVERY detent (rounded corners all around,
+  // like Apple Maps). gorhom sizes the background to the sheet's visible
+  // height, so the card edge is just a constant bottom inset — but the CONTENT
+  // runs to the full surface bottom far below the screen, so the scroll area
+  // gets an explicit animated height ending at the card's edge instead.
+  const collapsedPosition = windowHeight - (snapPoints[0] as number);
+  // The background is sized to the sheet's full surface (whose bottom sits far
+  // below the screen at low detents) — measure it and lift the glass's bottom
+  // edge to exactly (screen bottom - gap).
+  const surfaceHeight = useSharedValue(windowHeight);
+  const sheetBgStyle = useAnimatedStyle(() => ({
+    bottom: Math.max(0, sheetTop.value + surfaceHeight.value - windowHeight + pillGap),
+  }));
+  const contentHeightStyle = useAnimatedStyle(() => ({
+    height: Math.max(
+      0,
+      windowHeight - pillGap - sheetTop.value - SHEET_HANDLE_HEIGHT - sheetHeaderHeight,
+    ),
+  }));
+  // Below the collapsed pill line, content fades out as the sheet approaches
+  // the bottom snap — only the title row remains in the pill.
+  const belowPillStyle = useAnimatedStyle(() => ({
+    opacity: interpolate(
+      sheetTop.value,
+      [collapsedPosition - 90, collapsedPosition - 20],
+      [1, 0],
+      Extrapolation.CLAMP,
+    ),
+  }));
+
   const fitToPlaces = useCallback(
     (animated: boolean) => {
       if (!mapReady.current || visiblePlaces.length === 0) return;
-      programmaticMove.current = true;
       if (visiblePlaces.length === 1) {
-        mapRef.current?.animateToRegion(
+        mapRef.current?.setRegion(
           {
             latitude: visiblePlaces[0].latitude,
             longitude: visiblePlaces[0].longitude,
             latitudeDelta: 0.02,
             longitudeDelta: 0.02,
           },
-          animated ? 400 : 0,
+          animated,
         );
         return;
       }
       mapRef.current?.fitToCoordinates(
         visiblePlaces.map((p) => ({ latitude: p.latitude, longitude: p.longitude })),
-        { edgePadding: { top: 100, left: 60, right: 60, bottom: 360 }, animated },
+        { top: 100, left: 60, right: 60, bottom: 360 },
+        animated,
       );
     },
     [visiblePlaces],
@@ -185,51 +262,34 @@ export default function GuideDetail() {
       const { status } = await Location.requestForegroundPermissionsAsync();
       if (status !== 'granted') return;
       const pos = await Location.getCurrentPositionAsync({});
-      programmaticMove.current = true;
-      mapRef.current?.animateToRegion(
+      mapRef.current?.setRegion(
         {
           latitude: pos.coords.latitude,
           longitude: pos.coords.longitude,
           latitudeDelta: 0.02,
           longitudeDelta: 0.02,
         },
-        500,
+        true,
       );
     } catch {
       // Ignore — location is optional.
     }
   }
 
-  // Step the camera zoom. halve the altitude to zoom in, double it to zoom out
-  // (Apple Maps camera; the zoom fallback covers a Google provider).
+  // Step the camera zoom: halve the altitude to zoom in, double it to zoom out.
   async function zoomBy(factor: number) {
     Haptics.selectionAsync();
     try {
-      const cam = await mapRef.current?.getCamera();
-      if (!cam) return;
-      programmaticMove.current = true;
-      if (cam.altitude) {
-        mapRef.current?.animateCamera({ altitude: cam.altitude * factor }, { duration: 250 });
-      } else if (cam.zoom != null) {
-        mapRef.current?.animateCamera({ zoom: cam.zoom - Math.log2(factor) }, { duration: 250 });
-      }
+      await mapRef.current?.zoomBy(factor);
     } catch {
       // Ignore — map may not be ready yet.
     }
   }
 
-  // Show "Search this area" only for genuine user pans. Our own camera moves set
-  // `programmaticMove`; we clear it when that move completes and swallow the
-  // trailing settle event for a moment. (isGesture is unreliable on iOS.)
-  function handleRegionChange(_region: Region, _details: Details) {
-    const now = Date.now();
-    if (programmaticMove.current) {
-      programmaticMove.current = false;
-      suppressUntil.current = now + 800;
-      return;
-    }
-    if (now < suppressUntil.current) return;
-    setShowSearchArea(true);
+  // Show "Search this area" only for genuine user pans. The native map tells
+  // gestures and app-driven camera moves apart.
+  function handleRegionChange(_region: Region, isUserGesture: boolean) {
+    if (isUserGesture) setShowSearchArea(true);
   }
 
   function searchThisArea() {
@@ -237,42 +297,63 @@ export default function GuideDetail() {
     openSearch();
   }
 
-  // Native (liquid-glass) long-press menu for a place: open in Maps, move layer, remove.
-  function placeMenuActions(place: Place): MenuAction[] {
-    const actions: MenuAction[] = [{ id: 'open', title: 'Open in Apple Maps' }];
-    // "Visited" is a personal mark, so every role (viewers included) gets it.
-    // `state` renders the native checkmark when the place is already visited.
-    actions.push({ id: 'visited', title: 'Visited', state: visited[place.id] ? 'on' : 'off' });
-    if (!canEdit) return actions; // viewers can open + mark visited, not modify
-    const targets = layers.filter((l) => l.id !== place.layerId);
-    if (targets.length > 0) {
-      actions.push({
-        id: 'move',
-        title: 'Move to Layer',
-        subactions: targets.map((l) => ({ id: `move:${l.id}`, title: `${l.emoji}  ${l.name}` })),
+  // Native long-press menu for a place (ActionSheetIOS). NOT @react-native-menu's
+  // MenuView: on the New Architecture its wrapper swallows child taps, which
+  // silently killed row presses (long-press worked, tap did nothing).
+  function showPlaceMenu(place: Place) {
+    if (!guide) return;
+    const entries: { label: string; destructive?: boolean; action: () => void }[] = [
+      { label: 'Open in Apple Maps', action: () => openPlaceInAppleMaps(place) },
+      {
+        // "Visited" is a personal mark, so every role (viewers included) gets it.
+        label: visited[place.id] ? 'Unmark Visited' : 'Mark Visited',
+        action: () => {
+          Haptics.selectionAsync();
+          toggleVisited(place.id);
+        },
+      },
+    ];
+    if (canEdit) {
+      const targets = layers.filter((l) => l.id !== place.layerId);
+      if (targets.length > 0) {
+        entries.push({
+          label: 'Move to Layer…',
+          action: () => showMoveToLayerMenu(place, targets),
+        });
+      }
+      entries.push({
+        label: 'Remove from Guide',
+        destructive: true,
+        action: () => confirmRemove(place),
       });
     }
-    actions.push({
-      id: 'remove',
-      title: 'Remove from Guide',
-      attributes: { destructive: true },
-    });
-    return actions;
+    const destructiveIndex = entries.findIndex((e) => e.destructive);
+    ActionSheetIOS.showActionSheetWithOptions(
+      {
+        title: place.name,
+        options: [...entries.map((e) => e.label), 'Cancel'],
+        cancelButtonIndex: entries.length,
+        destructiveButtonIndex: destructiveIndex >= 0 ? destructiveIndex : undefined,
+      },
+      (index) => entries[index]?.action(),
+    );
   }
 
-  function handlePlaceMenuAction(place: Place, event: string) {
-    if (!guide) return;
-    if (event === 'open') {
-      openPlaceInAppleMaps(place);
-    } else if (event === 'visited') {
-      Haptics.selectionAsync();
-      toggleVisited(place.id);
-    } else if (event.startsWith('move:')) {
-      Haptics.selectionAsync();
-      movePlaceToLayer(guide.id, place.id, event.slice('move:'.length));
-    } else if (event === 'remove') {
-      confirmRemove(place);
-    }
+  function showMoveToLayerMenu(place: Place, targets: Layer[]) {
+    ActionSheetIOS.showActionSheetWithOptions(
+      {
+        title: `Move “${place.name}” to`,
+        options: [...targets.map((l) => l.name), 'Cancel'],
+        cancelButtonIndex: targets.length,
+      },
+      (index) => {
+        const target = targets[index];
+        if (target && guide) {
+          Haptics.selectionAsync();
+          movePlaceToLayer(guide.id, place.id, target.id);
+        }
+      },
+    );
   }
 
   // Center on the user when a fresh guide has no places yet.
@@ -285,15 +366,14 @@ export default function GuideDetail() {
       const pos = await Location.getLastKnownPositionAsync();
       const loc = pos ?? (await Location.getCurrentPositionAsync({}));
       if (!loc || cancelled) return;
-      programmaticMove.current = true;
-      mapRef.current?.animateToRegion(
+      mapRef.current?.setRegion(
         {
           latitude: loc.coords.latitude,
           longitude: loc.coords.longitude,
           latitudeDelta: 0.05,
           longitudeDelta: 0.05,
         },
-        500,
+        true,
       );
     })();
     return () => {
@@ -315,11 +395,23 @@ export default function GuideDetail() {
   function focusPlace(place: Place) {
     Haptics.selectionAsync();
     sheetRef.current?.snapToIndex(1); // medium — keep the list visible, reveal the map
-    programmaticMove.current = true;
     // Pan to the pin at the current zoom (gentle) rather than zooming in hard.
-    mapRef.current?.animateCamera(
-      { center: { latitude: place.latitude, longitude: place.longitude } },
-      { duration: 600 },
+    mapRef.current?.setCenter({ latitude: place.latitude, longitude: place.longitude }, true);
+  }
+
+  // List row tap: pan AND zoom to street level, so the pin stands alone on the
+  // map (far enough in to split out of any cluster). No selection — just show it.
+  function goToPlace(place: Place) {
+    Haptics.selectionAsync();
+    sheetRef.current?.snapToIndex(1);
+    mapRef.current?.setRegion(
+      {
+        latitude: place.latitude,
+        longitude: place.longitude,
+        latitudeDelta: 0.005,
+        longitudeDelta: 0.005,
+      },
+      true,
     );
   }
 
@@ -347,20 +439,35 @@ export default function GuideDetail() {
     let lng: number | undefined;
     try {
       const cam = await mapRef.current?.getCamera();
-      if (cam?.center) {
-        lat = cam.center.latitude;
-        lng = cam.center.longitude;
+      if (cam) {
+        lat = cam.latitude;
+        lng = cam.longitude;
       }
     } catch {
       // Fall back to no map bias; the search screen will try device location.
     }
-    router.push({
+    router.navigate({
       pathname: '/guide/[id]/search',
       params: {
         id: guide.id,
         ...(lat != null && lng != null ? { lat: String(lat), lng: String(lng) } : {}),
       },
     });
+  }
+
+  function openPlaceSearch() {
+    Haptics.selectionAsync();
+    setSearchOpen(true);
+    // Open to the medium detent (not full height) so the field and some results
+    // are visible while the map stays in view.
+    sheetRef.current?.snapToIndex(1);
+    setTimeout(() => searchInputRef.current?.focus(), 250);
+  }
+
+  function closePlaceSearch() {
+    Keyboard.dismiss();
+    setSearch('');
+    setSearchOpen(false);
   }
 
   // Guide was deleted while open.
@@ -384,32 +491,33 @@ export default function GuideDetail() {
     <View style={styles.fill}>
       <GuideMap
         ref={mapRef}
-        places={visiblePlaces}
+        places={mapPlaces}
         layerColors={layerColors}
-        layerEmojis={layerEmojis}
+        layerIcons={layerIcons}
         initialRegion={DEFAULT_REGION}
         onMarkerPress={focusPlace}
-        onAutoCameraMove={() => {
-          programmaticMove.current = true;
-        }}
-        onRegionChangeComplete={handleRegionChange}
+        onRegionChange={handleRegionChange}
         onMapReady={() => {
           mapReady.current = true;
-          programmaticMove.current = true;
           fitToPlaces(false);
         }}
       />
 
-      {/* Floating top bar */}
+      {/* Floating top bar — Liquid Glass chrome over the map */}
       <View style={[styles.topBar, { top: insets.top + spacing.sm }]}>
-        <Pressable
-          onPress={goBack}
-          style={[styles.circleBtn, { backgroundColor: colors.surface }]}
-          hitSlop={8}
+        <GlassSurface
+          interactive
+          style={styles.circleBtn}
+          fallbackStyle={[{ backgroundColor: colors.surface }, styles.fallbackShadow]}
         >
-          <Ionicons name="chevron-back" size={22} color={colors.textPrimary} />
-        </Pressable>
-        <View style={[styles.titlePill, { backgroundColor: colors.surface }]}>
+          <Pressable onPress={goBack} style={styles.btnInner} hitSlop={8}>
+            <Icon name="chevron.left" size={22} color={colors.textPrimary} />
+          </Pressable>
+        </GlassSurface>
+        <GlassSurface
+          style={styles.titlePill}
+          fallbackStyle={[{ backgroundColor: colors.surface }, styles.fallbackShadow]}
+        >
           <Text style={styles.titleEmoji}>{guide.emoji}</Text>
           <Text
             numberOfLines={1}
@@ -417,74 +525,90 @@ export default function GuideDetail() {
           >
             {guide.name}
           </Text>
-        </View>
-        <Pressable
-          onPress={() => router.push(`/guide/${guide.id}/settings`)}
-          style={[styles.circleBtn, { backgroundColor: colors.surface }]}
-          hitSlop={8}
+        </GlassSurface>
+        <GlassSurface
+          interactive
+          style={styles.circleBtn}
+          fallbackStyle={[{ backgroundColor: colors.surface }, styles.fallbackShadow]}
         >
-          <Ionicons name="settings-outline" size={20} color={colors.textPrimary} />
-        </Pressable>
+          <Pressable
+            onPress={() => router.navigate(`/guide/${guide.id}/settings`)}
+            style={styles.btnInner}
+            hitSlop={8}
+          >
+            <Icon name="gearshape" size={20} color={colors.textPrimary} />
+          </Pressable>
+        </GlassSurface>
       </View>
 
       {/* "Search this area" pill — appears after the user pans the map */}
       {showSearchArea && (
         <View style={[styles.searchAreaWrap, { top: insets.top + 58 }]} pointerEvents="box-none">
-          <Pressable
-            onPress={searchThisArea}
-            style={({ pressed }) => [
-              styles.searchAreaPill,
-              { backgroundColor: colors.surface },
-              pressed && { opacity: 0.7 },
-            ]}
+          <GlassSurface
+            interactive
+            style={styles.searchAreaPill}
+            fallbackStyle={[{ backgroundColor: colors.surface }, styles.fallbackShadow]}
           >
-            <Ionicons name="search" size={15} color={colors.accent} />
-            <Text style={[typography.caption, styles.searchAreaText, { color: colors.accent }]}>
-              Search this area
-            </Text>
-          </Pressable>
+            <Pressable
+              onPress={searchThisArea}
+              style={({ pressed }) => [styles.searchAreaInner, pressed && { opacity: 0.7 }]}
+            >
+              <Icon name="magnifyingglass" size={15} color={colors.accent} />
+              <Text style={[typography.caption, styles.searchAreaText, { color: colors.accent }]}>
+                Search this area
+              </Text>
+            </Pressable>
+          </GlassSurface>
         </View>
       )}
 
-      {/* Floating map controls — ride just above the sheet */}
+      {/* Floating map controls — ride just above the sheet. Zoom buttons share
+          one glass capsule, Apple Maps-style; locate + fit are glass circles. */}
       <Animated.View style={[styles.controlsWrap, { right: spacing.lg }, controlsStyle]}>
-        <Pressable
-          onPress={() => zoomBy(0.5)}
-          style={[styles.recenterBtn, { backgroundColor: colors.surface }]}
-          hitSlop={8}
+        <GlassSurface
+          interactive
+          style={styles.zoomPill}
+          fallbackStyle={[{ backgroundColor: colors.surface }, styles.fallbackShadow]}
         >
-          <Ionicons name="add" size={24} color={colors.textPrimary} />
-        </Pressable>
-        <Pressable
-          onPress={() => zoomBy(2)}
-          style={[styles.recenterBtn, { backgroundColor: colors.surface }]}
-          hitSlop={8}
+          <Pressable onPress={() => zoomBy(0.5)} style={styles.btnInnerFixed} hitSlop={8}>
+            <Icon name="plus" size={24} color={colors.textPrimary} />
+          </Pressable>
+          <View style={[styles.zoomDivider, { backgroundColor: colors.border }]} />
+          <Pressable onPress={() => zoomBy(2)} style={styles.btnInnerFixed} hitSlop={8}>
+            <Icon name="minus" size={24} color={colors.textPrimary} />
+          </Pressable>
+        </GlassSurface>
+        <GlassSurface
+          interactive
+          style={styles.recenterBtn}
+          fallbackStyle={[{ backgroundColor: colors.surface }, styles.fallbackShadow]}
         >
-          <Ionicons name="remove" size={24} color={colors.textPrimary} />
-        </Pressable>
-        <Pressable
-          onPress={locateMe}
-          style={[styles.recenterBtn, { backgroundColor: colors.surface }]}
-          hitSlop={8}
+          <Pressable onPress={locateMe} style={styles.btnInner} hitSlop={8}>
+            <Icon name="location" size={22} color={colors.accent} />
+          </Pressable>
+        </GlassSurface>
+        <GlassSurface
+          interactive
+          style={styles.recenterBtn}
+          fallbackStyle={[{ backgroundColor: colors.surface }, styles.fallbackShadow]}
         >
-          <Ionicons name="locate" size={22} color={colors.accent} />
-        </Pressable>
-        <Pressable
-          onPress={() => {
-            Haptics.selectionAsync();
-            setShowSearchArea(false);
-            fitToPlaces(true);
-          }}
-          disabled={visiblePlaces.length === 0}
-          style={[styles.recenterBtn, { backgroundColor: colors.surface }]}
-          hitSlop={8}
-        >
-          <Ionicons
-            name="scan-outline"
-            size={22}
-            color={visiblePlaces.length === 0 ? colors.textTertiary : colors.textPrimary}
-          />
-        </Pressable>
+          <Pressable
+            onPress={() => {
+              Haptics.selectionAsync();
+              setShowSearchArea(false);
+              fitToPlaces(true);
+            }}
+            disabled={visiblePlaces.length === 0}
+            style={styles.btnInner}
+            hitSlop={8}
+          >
+            <Icon
+              name="viewfinder"
+              size={22}
+              color={visiblePlaces.length === 0 ? colors.textTertiary : colors.textPrimary}
+            />
+          </Pressable>
+        </GlassSurface>
       </Animated.View>
 
       <BottomSheet
@@ -493,7 +617,24 @@ export default function GuideDetail() {
         snapPoints={snapPoints}
         enableDynamicSizing={false}
         animatedPosition={sheetTop}
-        backgroundStyle={{ backgroundColor: colors.surface }}
+        style={styles.sheetFloat}
+        backgroundComponent={({ style }) => (
+          <View style={style} pointerEvents="none">
+            {/* Measures the surface's true (taller-than-screen) height. */}
+            <View
+              style={StyleSheet.absoluteFill}
+              onLayout={(e) => {
+                surfaceHeight.value = e.nativeEvent.layout.height;
+              }}
+            />
+            <Animated.View style={[styles.sheetGlassWrap, sheetBgStyle]}>
+              <GlassSurface
+                style={styles.sheetGlass}
+                fallbackStyle={{ backgroundColor: colors.surface }}
+              />
+            </Animated.View>
+          </View>
+        )}
         handleIndicatorStyle={{ backgroundColor: colors.handle }}
       >
         <View
@@ -509,30 +650,43 @@ export default function GuideDetail() {
             </Text>
           </View>
           <View style={styles.headerActions}>
-            {isOwner && (
+            {places.length > 0 && !searchOpen && (
               <Pressable
-                onPress={() => router.push(`/guide/${guide.id}/share`)}
+                onPress={openPlaceSearch}
                 style={({ pressed }) => [
                   styles.iconBtn,
-                  { backgroundColor: colors.surfaceAlt },
+                  { backgroundColor: colors.fill },
                   pressed && { opacity: 0.6 },
                 ]}
                 hitSlop={6}
               >
-                <Ionicons name="share-outline" size={20} color={colors.textPrimary} />
+                <Icon name="magnifyingglass" size={20} color={colors.textPrimary} />
+              </Pressable>
+            )}
+            {isOwner && (
+              <Pressable
+                onPress={() => router.navigate(`/guide/${guide.id}/share`)}
+                style={({ pressed }) => [
+                  styles.iconBtn,
+                  { backgroundColor: colors.fill },
+                  pressed && { opacity: 0.6 },
+                ]}
+                hitSlop={6}
+              >
+                <Icon name="square.and.arrow.up" size={20} color={colors.textPrimary} />
               </Pressable>
             )}
             {canEdit && (
               <Pressable
-                onPress={() => router.push(`/guide/${guide.id}/layers`)}
+                onPress={() => router.navigate(`/guide/${guide.id}/layers`)}
                 style={({ pressed }) => [
                   styles.iconBtn,
-                  { backgroundColor: colors.surfaceAlt },
+                  { backgroundColor: colors.fill },
                   pressed && { opacity: 0.6 },
                 ]}
                 hitSlop={6}
               >
-                <Ionicons name="layers-outline" size={20} color={colors.textPrimary} />
+                <Icon name="square.stack.3d.up" size={20} color={colors.textPrimary} />
               </Pressable>
             )}
             {canEdit && (
@@ -544,123 +698,160 @@ export default function GuideDetail() {
                   pressed && { opacity: 0.8 },
                 ]}
               >
-                <Ionicons name="add" size={18} color="#fff" />
+                <Icon name="plus" size={18} color="#fff" />
                 <Text style={[typography.bodyMedium, { color: '#fff' }]}>Add</Text>
               </Pressable>
             )}
           </View>
         </View>
 
-        {layers.length > 0 && (
-          <View style={styles.toolbar}>
-            <Pressable
-              onPress={toggleShowAll}
-              style={({ pressed }) => [
-                styles.toolBtn,
-                { backgroundColor: colors.surfaceAlt },
-                pressed && { opacity: 0.6 },
-              ]}
-            >
-              <Ionicons
-                name={allHidden ? 'eye-outline' : 'eye-off-outline'}
-                size={15}
-                color={colors.textSecondary}
-              />
-              <Text style={[typography.caption, styles.toolLabel, { color: colors.textSecondary }]}>
-                {allHidden ? 'Show all' : 'Hide all'}
-              </Text>
-            </Pressable>
-
-            <Pressable
-              onPress={toggleCollapseAll}
-              style={({ pressed }) => [
-                styles.toolBtn,
-                { backgroundColor: colors.surfaceAlt },
-                pressed && { opacity: 0.6 },
-              ]}
-            >
-              <Ionicons
-                name={allCollapsed ? 'chevron-down' : 'chevron-up'}
-                size={15}
-                color={colors.textSecondary}
-              />
-              <Text style={[typography.caption, styles.toolLabel, { color: colors.textSecondary }]}>
-                {allCollapsed ? 'Expand all' : 'Collapse all'}
-              </Text>
-            </Pressable>
-          </View>
-        )}
-
-        <BottomSheetSectionList
-          sections={sections}
-          keyExtractor={(p) => p.id}
-          stickySectionHeadersEnabled={false}
-          contentContainerStyle={{
-            paddingHorizontal: spacing.lg,
-            paddingBottom: insets.bottom + spacing.xl,
-          }}
-          ListEmptyComponent={
-            <View style={[styles.sheetEmpty, { height: emptyStateHeight }]}>
-              <Ionicons name="location-outline" size={30} color={colors.textTertiary} />
-              <Text style={[typography.body, { color: colors.textSecondary, textAlign: 'center' }]}>
-                Tap “Add” to search for places and drop them on the map.
-              </Text>
-            </View>
-          }
-          renderSectionHeader={({ section }) => (
-            <Pressable
-              onPress={() => collapseLayer(section.layer)}
-              style={({ pressed }) => [styles.layerHeader, pressed && { opacity: 0.6 }]}
-            >
-              <Ionicons
-                name={section.layer.collapsed ? 'chevron-forward' : 'chevron-down'}
-                size={16}
-                color={colors.textTertiary}
-              />
-              <View style={[styles.layerBadge, { backgroundColor: section.layer.color + '22' }]}>
-                <Text style={styles.layerEmoji}>{section.layer.emoji}</Text>
+        {/* Height-bound to the card's floating bottom edge; fades out near the
+            collapsed snap so only the title row remains in the pill. */}
+        <Animated.View style={[styles.clip, belowPillStyle, contentHeightStyle]}>
+          {searchOpen && (
+            <View style={styles.searchRow}>
+              <View style={[styles.searchBox, { backgroundColor: colors.fill }]}>
+                <Icon name="magnifyingglass" size={18} color={colors.textTertiary} />
+                <TextInput
+                  ref={searchInputRef}
+                  value={search}
+                  onChangeText={setSearch}
+                  placeholder="Search this guide"
+                  placeholderTextColor={colors.textTertiary}
+                  autoCorrect={false}
+                  returnKeyType="search"
+                  clearButtonMode="never"
+                  style={[styles.searchInput, { color: colors.textPrimary }]}
+                />
+                {search.length > 0 && (
+                  <Pressable onPress={() => setSearch('')} hitSlop={8}>
+                    <Icon name="xmark.circle.fill" size={18} color={colors.textTertiary} />
+                  </Pressable>
+                )}
               </View>
-              <Text
-                numberOfLines={1}
-                style={[typography.bodyMedium, { color: colors.textPrimary, flex: 1 }]}
-              >
-                {section.layer.name}
-              </Text>
-              <Text
-                style={[
-                  typography.caption,
-                  { color: colors.textTertiary, marginRight: spacing.md },
+              <Pressable onPress={closePlaceSearch} hitSlop={8}>
+                <Text style={[typography.bodyMedium, { color: colors.accent }]}>Cancel</Text>
+              </Pressable>
+            </View>
+          )}
+
+          {layers.length > 0 && !searchOpen && (
+            <View style={styles.toolbar}>
+              <Pressable
+                onPress={toggleShowAll}
+                style={({ pressed }) => [
+                  styles.toolBtn,
+                  { backgroundColor: colors.fill },
+                  pressed && { opacity: 0.6 },
                 ]}
               >
-                {section.count}
-              </Text>
-              <Pressable onPress={() => hideLayer(section.layer)} hitSlop={10}>
-                <Ionicons
-                  name={section.layer.hidden ? 'eye-off-outline' : 'eye-outline'}
-                  size={20}
-                  color={section.layer.hidden ? colors.textTertiary : colors.accent}
+                <Icon
+                  name={allHidden ? 'eye' : 'eye.slash'}
+                  size={15}
+                  color={colors.textSecondary}
                 />
+                <Text
+                  style={[typography.caption, styles.toolLabel, { color: colors.textSecondary }]}
+                >
+                  {allHidden ? 'Show all' : 'Hide all'}
+                </Text>
               </Pressable>
-            </Pressable>
+
+              <Pressable
+                onPress={toggleCollapseAll}
+                style={({ pressed }) => [
+                  styles.toolBtn,
+                  { backgroundColor: colors.fill },
+                  pressed && { opacity: 0.6 },
+                ]}
+              >
+                <Icon
+                  name={allCollapsed ? 'chevron.down' : 'chevron.up'}
+                  size={15}
+                  color={colors.textSecondary}
+                />
+                <Text
+                  style={[typography.caption, styles.toolLabel, { color: colors.textSecondary }]}
+                >
+                  {allCollapsed ? 'Expand all' : 'Collapse all'}
+                </Text>
+              </Pressable>
+            </View>
           )}
-          renderItem={({ item, section }) => (
-            <MenuView
-              title={item.name}
-              shouldOpenOnLongPress
-              actions={placeMenuActions(item)}
-              onPressAction={({ nativeEvent }) => handlePlaceMenuAction(item, nativeEvent.event)}
-            >
+
+          <BottomSheetSectionList
+            sections={sections}
+            keyExtractor={(p) => p.id}
+            stickySectionHeadersEnabled={false}
+            contentContainerStyle={{
+              paddingHorizontal: spacing.lg,
+              paddingBottom: insets.bottom + spacing.xl,
+            }}
+            ListEmptyComponent={
+              <View style={[styles.sheetEmpty, { height: emptyStateHeight }]}>
+                <Icon
+                  name={searching ? 'magnifyingglass' : 'mappin'}
+                  size={30}
+                  color={colors.textTertiary}
+                />
+                <Text
+                  style={[typography.body, { color: colors.textSecondary, textAlign: 'center' }]}
+                >
+                  {searching
+                    ? `No places match “${search.trim()}”.`
+                    : 'Tap “Add” to search for places and drop them on the map.'}
+                </Text>
+              </View>
+            }
+            renderSectionHeader={({ section }) => (
+              <Pressable
+                onPress={() => collapseLayer(section.layer)}
+                style={({ pressed }) => [styles.layerHeader, pressed && { opacity: 0.6 }]}
+              >
+                <Icon
+                  name={section.layer.collapsed ? 'chevron.right' : 'chevron.down'}
+                  size={16}
+                  color={colors.textTertiary}
+                />
+                <View style={[styles.layerBadge, { backgroundColor: section.layer.color + '22' }]}>
+                  <LayerIcon name={section.layer.icon} size={15} tintColor={section.layer.color} />
+                </View>
+                <Text
+                  numberOfLines={1}
+                  style={[typography.bodyMedium, { color: colors.textPrimary, flex: 1 }]}
+                >
+                  {section.layer.name}
+                </Text>
+                <Text
+                  style={[
+                    typography.caption,
+                    { color: colors.textTertiary, marginRight: spacing.md },
+                  ]}
+                >
+                  {section.count}
+                </Text>
+                <Pressable onPress={() => hideLayer(section.layer)} hitSlop={10}>
+                  <Icon
+                    name={section.layer.hidden ? 'eye.slash' : 'eye'}
+                    size={20}
+                    color={section.layer.hidden ? colors.textTertiary : colors.accent}
+                  />
+                </Pressable>
+              </Pressable>
+            )}
+            renderItem={({ item, section }) => (
               <PlaceRow
                 place={item}
                 color={section.layer.color}
-                onPress={() => focusPlace(item)}
+                onPress={() => goToPlace(item)}
+                onLongPress={() => showPlaceMenu(item)}
                 onDelete={() => removePlaceFromGuide(guide.id, item.id)}
                 readOnly={!canEdit}
                 visited={!!visited[item.id]}
               />
-            </MenuView>
-          )}
-        />
+            )}
+          />
+        </Animated.View>
       </BottomSheet>
     </View>
   );
@@ -680,8 +871,19 @@ const styles = StyleSheet.create({
     width: 40,
     height: 40,
     borderRadius: radius.pill,
+    overflow: 'hidden',
+  },
+  // Centers the icon inside a GlassSurface of any size.
+  btnInner: { flex: 1, alignItems: 'center', justifyContent: 'center' },
+  // One fixed-height button inside the zoom capsule.
+  btnInnerFixed: {
+    width: RECENTER_SIZE,
+    height: RECENTER_SIZE,
     alignItems: 'center',
     justifyContent: 'center',
+  },
+  // Pre-Liquid-Glass look: the solid chrome these elements had before.
+  fallbackShadow: {
     shadowColor: '#000',
     shadowOpacity: 0.12,
     shadowRadius: 6,
@@ -700,30 +902,32 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   searchAreaPill: {
+    height: 38,
+    borderRadius: radius.pill,
+    overflow: 'hidden',
+  },
+  searchAreaInner: {
+    flex: 1,
     flexDirection: 'row',
     alignItems: 'center',
     gap: spacing.xs,
     paddingHorizontal: spacing.lg,
-    height: 38,
-    borderRadius: radius.pill,
-    shadowColor: '#000',
-    shadowOpacity: 0.15,
-    shadowRadius: 6,
-    shadowOffset: { width: 0, height: 2 },
-    elevation: 4,
   },
   searchAreaText: { fontWeight: '600' },
   recenterBtn: {
     width: RECENTER_SIZE,
     height: RECENTER_SIZE,
     borderRadius: radius.pill,
-    alignItems: 'center',
-    justifyContent: 'center',
-    shadowColor: '#000',
-    shadowOpacity: 0.12,
-    shadowRadius: 6,
-    shadowOffset: { width: 0, height: 2 },
-    elevation: 3,
+    overflow: 'hidden',
+  },
+  zoomPill: {
+    width: RECENTER_SIZE,
+    borderRadius: RECENTER_SIZE / 2,
+    overflow: 'hidden',
+  },
+  zoomDivider: {
+    height: StyleSheet.hairlineWidth,
+    marginHorizontal: 10,
   },
   titlePill: {
     flexDirection: 'row',
@@ -732,11 +936,34 @@ const styles = StyleSheet.create({
     paddingHorizontal: spacing.md,
     height: 40,
     borderRadius: radius.pill,
-    shadowColor: '#000',
-    shadowOpacity: 0.12,
-    shadowRadius: 6,
-    shadowOffset: { width: 0, height: 2 },
-    elevation: 3,
+  },
+  // Floating glass panel, inset from the screen edges at every detent. The
+  // radius + clip here round the content's TOP corners (the surface's bottom
+  // corners live below the screen, so the content wrapper rounds those).
+  sheetFloat: {
+    marginHorizontal: spacing.sm,
+    borderRadius: CARD_RADIUS,
+    overflow: 'hidden',
+  },
+  clip: {
+    overflow: 'hidden',
+    borderBottomLeftRadius: CARD_RADIUS,
+    borderBottomRightRadius: CARD_RADIUS,
+  },
+  // The card's glass background. Corner radius is concentric with the device:
+  // roughly the display's corner radius minus the 8pt margin, so the card's
+  // curves run parallel to the screen corners (Apple's floating-sheet look).
+  sheetGlassWrap: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    borderRadius: CARD_RADIUS,
+    overflow: 'hidden',
+  },
+  sheetGlass: {
+    ...StyleSheet.absoluteFillObject,
+    borderRadius: CARD_RADIUS,
   },
   titleEmoji: { fontSize: 18 },
   sheetHeader: {
@@ -749,6 +976,23 @@ const styles = StyleSheet.create({
   },
   sheetHeaderText: { flex: 1, marginRight: spacing.md },
   headerActions: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
+  searchRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.md,
+    paddingHorizontal: spacing.lg,
+    paddingBottom: spacing.sm,
+  },
+  searchBox: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
+    paddingHorizontal: spacing.md,
+    height: 40,
+    borderRadius: radius.sm,
+  },
+  searchInput: { flex: 1, fontSize: 16, paddingVertical: 0, letterSpacing: 0 }, // letterSpacing guards vs RN#42589
   toolbar: {
     flexDirection: 'row',
     gap: spacing.sm,
@@ -799,5 +1043,4 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  layerEmoji: { fontSize: 15 },
 });

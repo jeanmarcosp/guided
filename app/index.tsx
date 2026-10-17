@@ -1,8 +1,9 @@
-import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
+import Icon from '@/components/Icon';
 import * as Haptics from 'expo-haptics';
 import { useRouter } from 'expo-router';
-import { useMemo, useState, type ReactNode } from 'react';
-import { Alert, FlatList, Pressable, StyleSheet, Text, View } from 'react-native';
+import { useShareIntentContext } from 'expo-share-intent';
+import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
+import { Alert, FlatList, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 import {
   NestedReorderableList,
   ScrollViewContainer,
@@ -10,9 +11,12 @@ import {
   type ReorderableListReorderEvent,
 } from 'react-native-reorderable-list';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import BusyOverlay from '@/components/BusyOverlay';
 import GuideCard from '@/components/GuideCard';
 import GuideCardSkeleton from '@/components/GuideCardSkeleton';
 import GuideEditor, { type GuideDraft } from '@/components/GuideEditor';
+import { decodeAppleGuideLink } from '@/lib/appleGuideImport';
+import { isAppleSearchAvailable, lookupApplePlaces } from '@/modules/apple-search';
 import SwipeActionRow, { type SwipeAction } from '@/components/SwipeActionRow';
 import type { Guide } from '@/lib/types';
 import { useGuides } from '@/store/guides';
@@ -25,6 +29,11 @@ type Row = { type: 'header'; label: string } | { type: 'guide'; guide: Guide; sh
 /** A guide shared with the user (not owned). */
 const isShared = (g: Guide) => g.role === 'viewer' || g.role === 'editor';
 
+/** Matches a guide by its name. */
+function guideMatches(g: Guide, q: string): boolean {
+  return g.name.toLowerCase().includes(q);
+}
+
 export default function GuidesHome() {
   const colors = useColors();
   const insets = useSafeAreaInsets();
@@ -34,12 +43,41 @@ export default function GuidesHome() {
   const hydrated = useGuides((s) => s.hydrated);
   const initialSyncDone = useGuides((s) => s.initialSyncDone);
   const createGuide = useGuides((s) => s.createGuide);
+  const addPlaceToGuide = useGuides((s) => s.addPlaceToGuide);
   const updateGuide = useGuides((s) => s.updateGuide);
   const deleteGuide = useGuides((s) => s.deleteGuide);
   const togglePinGuide = useGuides((s) => s.togglePinGuide);
   const setGuidesOrder = useGuides((s) => s.setGuidesOrder);
 
   const [editor, setEditor] = useState<EditorState | null>(null);
+  const [importing, setImporting] = useState(false);
+  const [searchOpen, setSearchOpen] = useState(false);
+  const [search, setSearch] = useState('');
+  const query = search.trim().toLowerCase();
+  const searching = query.length > 0;
+  const searchInputRef = useRef<TextInput>(null);
+
+  function openSearch() {
+    Haptics.selectionAsync();
+    setSearchOpen(true);
+    setTimeout(() => searchInputRef.current?.focus(), 50);
+  }
+
+  function closeSearch() {
+    setSearch('');
+    setSearchOpen(false);
+  }
+
+  // Shared straight from Apple Maps' share sheet (share extension): consume
+  // the link and run the guide import — no copy/paste needed.
+  const { hasShareIntent, shareIntent, resetShareIntent } = useShareIntentContext();
+  useEffect(() => {
+    if (!hasShareIntent) return;
+    const url = shareIntent.webUrl ?? shareIntent.text ?? '';
+    resetShareIntent();
+    if (url) void runImport(url);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [hasShareIntent]);
   const [reordering, setReordering] = useState(false);
   const editingGuide = editor?.mode === 'edit' ? guides.find((g) => g.id === editor.id) : undefined;
 
@@ -81,8 +119,18 @@ export default function GuidesHome() {
     [rows],
   );
 
-  function handleCreate() {
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+  // While searching, show a flat list of matching guides (owned first, then
+  // shared) — no section headers, pinning, or reordering.
+  const filteredRows = useMemo<Row[]>(() => {
+    if (!searching) return [];
+    const match = (g: Guide) => guideMatches(g, query);
+    return [
+      ...ownedGuides.filter(match).map((g): Row => ({ type: 'guide', guide: g })),
+      ...sharedGuides.filter(match).map((g): Row => ({ type: 'guide', guide: g, shared: true })),
+    ];
+  }, [searching, query, ownedGuides, sharedGuides]);
+
+  function openCreateEditor() {
     const seed = guides.length;
     setEditor({
       mode: 'create',
@@ -92,6 +140,55 @@ export default function GuidesHome() {
         emoji: GUIDE_EMOJIS[seed % GUIDE_EMOJIS.length],
       },
     });
+  }
+
+  function handleCreate() {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    // Straight into the editor — creating from scratch is the common case.
+    // Importing is offered as a secondary action inside the create sheet.
+    openCreateEditor();
+  }
+
+  function promptImport() {
+    Alert.prompt(
+      'Import from Apple Maps',
+      'Paste the share link of an Apple Maps guide (Guides → share).',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        { text: 'Import', onPress: (link?: string) => link && runImport(link) },
+      ],
+      'plain-text',
+      undefined,
+      'url',
+    );
+  }
+
+  async function runImport(link: string) {
+    setImporting(true);
+    try {
+      const decoded = await decodeAppleGuideLink(link);
+      const places = await lookupApplePlaces(decoded.placeIds);
+      if (places.length === 0) {
+        throw new Error('None of the places in that guide could be loaded.');
+      }
+      const guide = createGuide(decoded.name);
+      for (const place of places) {
+        addPlaceToGuide(guide.id, place);
+      }
+      setImporting(false);
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      const skipped = decoded.placeIds.length - places.length;
+      if (skipped > 0) {
+        Alert.alert(
+          'Guide imported',
+          `${places.length} place${places.length === 1 ? '' : 's'} imported; ${skipped} could not be found.`,
+        );
+      }
+      router.navigate(`/guide/${guide.id}`);
+    } catch (e: any) {
+      setImporting(false);
+      Alert.alert('Import failed', e?.message ?? 'Please try again.');
+    }
   }
 
   function handleEdit(guide: Guide) {
@@ -107,7 +204,7 @@ export default function GuidesHome() {
     if (editor.mode === 'create') {
       const guide = createGuide(draft.name || 'Untitled Guide', draft.emoji, draft.color);
       setEditor(null);
-      router.push(`/guide/${guide.id}`);
+      router.navigate(`/guide/${guide.id}`);
     } else {
       updateGuide(editor.id, draft);
       setEditor(null);
@@ -140,9 +237,7 @@ export default function GuidesHome() {
   const swipeActions = (guide: Guide): SwipeAction[] => [
     {
       key: 'pin',
-      icon: (
-        <MaterialCommunityIcons name={guide.pinned ? 'pin-off' : 'pin'} size={20} color="#fff" />
-      ),
+      icon: <Icon name={guide.pinned ? 'pin.slash.fill' : 'pin.fill'} size={20} color="#fff" />,
       color: '#FF9500',
       onPress: () => {
         Haptics.selectionAsync();
@@ -151,7 +246,7 @@ export default function GuidesHome() {
     },
     {
       key: 'delete',
-      icon: <Ionicons name="trash" size={20} color="#fff" />,
+      icon: <Icon name="trash.fill" size={20} color="#fff" />,
       color: colors.danger,
       onPress: () => confirmDeleteGuide(guide),
     },
@@ -206,7 +301,7 @@ export default function GuidesHome() {
     if (item.shared) {
       return (
         <View style={styles.guideSpacer}>
-          <Pressable onPress={() => router.push(`/guide/${g.id}`)}>
+          <Pressable onPress={() => router.navigate(`/guide/${g.id}`)}>
             <GuideCard guide={g} />
           </Pressable>
         </View>
@@ -216,7 +311,7 @@ export default function GuidesHome() {
       <View style={styles.guideSpacer}>
         <SwipeActionRow
           actions={swipeActions(g)}
-          onPress={() => router.push(`/guide/${g.id}`)}
+          onPress={() => router.navigate(`/guide/${g.id}`)}
           onLongPress={() => handleEdit(g)}
         >
           <GuideCard guide={g} />
@@ -227,7 +322,7 @@ export default function GuidesHome() {
 
   // Reorder-mode row (grip drag, no swipe).
   const renderDragRow = ({ item }: { item: Guide }) => (
-    <GuideDragRow guide={item} onPress={() => router.push(`/guide/${item.id}`)} />
+    <GuideDragRow guide={item} onPress={() => router.navigate(`/guide/${item.id}`)} />
   );
 
   // Reorder mode: one nested list per group inside a sticky-header scroll view.
@@ -299,7 +394,7 @@ export default function GuidesHome() {
           ) : (
             <>
               <Pressable
-                onPress={() => router.push('/settings')}
+                onPress={() => router.navigate('/settings')}
                 style={({ pressed }) => [
                   styles.iconBtn,
                   { backgroundColor: colors.surface, borderColor: colors.border },
@@ -307,9 +402,22 @@ export default function GuidesHome() {
                 ]}
                 hitSlop={8}
               >
-                <Ionicons name="person-circle-outline" size={22} color={colors.textPrimary} />
+                <Icon name="person.circle" size={22} color={colors.textPrimary} />
               </Pressable>
-              {canReorder && (
+              {guides.length > 0 && (
+                <Pressable
+                  onPress={openSearch}
+                  style={({ pressed }) => [
+                    styles.iconBtn,
+                    { backgroundColor: colors.surface, borderColor: colors.border },
+                    pressed && { opacity: 0.6 },
+                  ]}
+                  hitSlop={8}
+                >
+                  <Icon name="magnifyingglass" size={20} color={colors.textPrimary} />
+                </Pressable>
+              )}
+              {canReorder && !searchOpen && (
                 <Pressable
                   onPress={() => setReordering(true)}
                   style={({ pressed }) => [
@@ -319,7 +427,7 @@ export default function GuidesHome() {
                   ]}
                   hitSlop={8}
                 >
-                  <Ionicons name="swap-vertical" size={20} color={colors.textPrimary} />
+                  <Icon name="arrow.up.arrow.down" size={20} color={colors.textPrimary} />
                 </Pressable>
               )}
               <Pressable
@@ -331,12 +439,39 @@ export default function GuidesHome() {
                 ]}
                 hitSlop={8}
               >
-                <Ionicons name="add" size={26} color="#fff" />
+                <Icon name="plus" size={26} color="#fff" />
               </Pressable>
             </>
           )}
         </View>
       </View>
+
+      {searchOpen && (
+        <View style={styles.searchRow}>
+          <View style={[styles.searchBox, { backgroundColor: colors.surfaceAlt }]}>
+            <Icon name="magnifyingglass" size={18} color={colors.textTertiary} />
+            <TextInput
+              ref={searchInputRef}
+              value={search}
+              onChangeText={setSearch}
+              placeholder="Search guides"
+              placeholderTextColor={colors.textTertiary}
+              autoCorrect={false}
+              returnKeyType="search"
+              clearButtonMode="never"
+              style={[styles.searchInput, { color: colors.textPrimary }]}
+            />
+            {search.length > 0 && (
+              <Pressable onPress={() => setSearch('')} hitSlop={8}>
+                <Icon name="xmark.circle.fill" size={18} color={colors.textTertiary} />
+              </Pressable>
+            )}
+          </View>
+          <Pressable onPress={closeSearch} hitSlop={8}>
+            <Text style={[typography.bodyMedium, { color: colors.accent }]}>Cancel</Text>
+          </Pressable>
+        </View>
+      )}
 
       {loadingGuides ? (
         <View style={contentStyle}>
@@ -354,7 +489,7 @@ export default function GuidesHome() {
               { backgroundColor: colors.surface, borderColor: colors.border },
             ]}
           >
-            <Ionicons name="map-outline" size={34} color={colors.textTertiary} />
+            <Icon name="map" size={34} color={colors.textTertiary} />
           </View>
           <Text style={[typography.heading, { color: colors.textPrimary }]}>No guides yet</Text>
           <Text style={[typography.body, styles.emptyText, { color: colors.textSecondary }]}>
@@ -368,7 +503,7 @@ export default function GuidesHome() {
               pressed && { opacity: 0.8 },
             ]}
           >
-            <Ionicons name="add" size={18} color="#fff" />
+            <Icon name="plus" size={18} color="#fff" />
             <Text style={[typography.bodyMedium, { color: '#fff' }]}>Create your first guide</Text>
           </Pressable>
         </View>
@@ -384,12 +519,24 @@ export default function GuidesHome() {
       ) : (
         <FlatList
           style={styles.container}
-          data={rows}
+          data={searching ? filteredRows : rows}
           keyExtractor={(row) => (row.type === 'header' ? `h-${row.label}` : row.guide.id)}
-          stickyHeaderIndices={stickyIndices}
+          stickyHeaderIndices={searching ? [] : stickyIndices}
+          keyboardShouldPersistTaps="handled"
           contentContainerStyle={contentStyle}
           showsVerticalScrollIndicator={false}
           renderItem={renderNormalItem}
+          ListEmptyComponent={
+            searching ? (
+              <View style={styles.searchEmpty}>
+                <Text
+                  style={[typography.body, { color: colors.textSecondary, textAlign: 'center' }]}
+                >
+                  No guides named “{search.trim()}”.
+                </Text>
+              </View>
+            ) : null
+          }
         />
       )}
 
@@ -401,8 +548,18 @@ export default function GuidesHome() {
         onTogglePin={editor?.mode === 'edit' ? () => togglePinGuide(editor.id) : undefined}
         onSubmit={handleSubmit}
         onDelete={editor?.mode === 'edit' ? handleDelete : undefined}
+        onImport={
+          isAppleSearchAvailable
+            ? () => {
+                setEditor(null);
+                promptImport();
+              }
+            : undefined
+        }
         onClose={() => setEditor(null)}
       />
+
+      <BusyOverlay visible={importing} label="Importing guide…" />
     </View>
   );
 }
@@ -425,7 +582,7 @@ function GuideDragRow({ guide, onPress }: { guide: Guide; onPress: () => void })
   return (
     <View style={styles.rowWrap}>
       <Pressable onLongPress={drag} delayLongPress={150} hitSlop={8} style={styles.grip}>
-        <Ionicons name="reorder-three" size={24} color={colors.textTertiary} />
+        <Icon name="line.3.horizontal" size={24} color={colors.textTertiary} />
       </Pressable>
       <Pressable style={styles.rowCard} onPress={onPress}>
         <GuideCard guide={guide} />
@@ -444,6 +601,24 @@ const styles = StyleSheet.create({
     paddingBottom: spacing.md,
   },
   headerActions: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
+  searchRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.md,
+    paddingHorizontal: spacing.lg,
+    paddingBottom: spacing.md,
+  },
+  searchEmpty: { paddingTop: spacing.xxl, paddingHorizontal: spacing.md, alignItems: 'center' },
+  searchBox: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
+    paddingHorizontal: spacing.md,
+    height: 40,
+    borderRadius: radius.sm,
+  },
+  searchInput: { flex: 1, fontSize: 16, paddingVertical: 0, letterSpacing: 0 }, // letterSpacing guards vs RN#42589
   doneBtn: { paddingHorizontal: spacing.sm, height: 40, justifyContent: 'center' },
   iconBtn: {
     width: 40,

@@ -1,4 +1,4 @@
-import { Ionicons } from '@expo/vector-icons';
+import Icon, { type IconName } from '@/components/Icon';
 import * as Haptics from 'expo-haptics';
 import * as ImagePicker from 'expo-image-picker';
 import { useRouter } from 'expo-router';
@@ -21,10 +21,10 @@ import { useAuth } from '@/store/auth';
 import { useSettings, type ThemeMode } from '@/store/settings';
 import { radius, spacing, typography, useColors } from '@/theme/tokens';
 
-const THEME_OPTIONS: { key: ThemeMode; label: string; icon: keyof typeof Ionicons.glyphMap }[] = [
-  { key: 'system', label: 'System', icon: 'contrast-outline' },
-  { key: 'light', label: 'Light', icon: 'sunny-outline' },
-  { key: 'dark', label: 'Dark', icon: 'moon-outline' },
+const THEME_OPTIONS: { key: ThemeMode; label: string; icon: IconName }[] = [
+  { key: 'system', label: 'System', icon: 'circle.lefthalf.filled' },
+  { key: 'light', label: 'Light', icon: 'sun.max' },
+  { key: 'dark', label: 'Dark', icon: 'moon' },
 ];
 
 export default function SettingsScreen() {
@@ -184,7 +184,7 @@ export default function SettingsScreen() {
           offsets against the padding box, so padding here would inset it. */}
       <View style={[styles.header, { paddingTop: insets.top + spacing.sm }]}>
         <Pressable onPress={goBack} hitSlop={8} style={styles.backBtn}>
-          <Ionicons name="chevron-back" size={24} color={colors.textPrimary} />
+          <Icon name="chevron.left" size={24} color={colors.textPrimary} />
         </Pressable>
         <Text style={[typography.title, { color: colors.textPrimary }]}>Settings</Text>
         <View style={styles.backBtn} />
@@ -212,7 +212,7 @@ export default function SettingsScreen() {
                 { backgroundColor: colors.accent, borderColor: colors.surface },
               ]}
             >
-              <Ionicons name="camera" size={11} color="#fff" />
+              <Icon name="camera.fill" size={11} color="#fff" />
             </View>
             {avatarBusy && (
               <View style={styles.avatarBusy}>
@@ -252,7 +252,7 @@ export default function SettingsScreen() {
                 (pressed || avatarBusy) && { opacity: 0.6 },
               ]}
             >
-              <Ionicons name="image-outline" size={18} color={colors.accent} />
+              <Icon name="photo" size={18} color={colors.accent} />
               <Text style={[typography.body, { color: colors.textPrimary }]}>
                 {avatarUrl ? 'Change Photo' : 'Choose Photo'}
               </Text>
@@ -267,7 +267,7 @@ export default function SettingsScreen() {
                   pressed && { opacity: 0.6 },
                 ]}
               >
-                <Ionicons name="trash-outline" size={18} color={colors.danger} />
+                <Icon name="trash" size={18} color={colors.danger} />
                 <Text style={[typography.body, { color: colors.danger }]}>Remove</Text>
               </Pressable>
             )}
@@ -289,7 +289,7 @@ export default function SettingsScreen() {
                     },
                   ]}
                 >
-                  {selected && <Ionicons name="checkmark" size={16} color="#fff" />}
+                  {selected && <Icon name="checkmark" size={16} color="#fff" />}
                 </Pressable>
               );
             })}
@@ -309,7 +309,7 @@ export default function SettingsScreen() {
                 onPress={() => pickTheme(opt.key)}
                 style={[styles.segmentItem, active && { backgroundColor: colors.surface }]}
               >
-                <Ionicons
+                <Icon
                   name={opt.icon}
                   size={18}
                   color={active ? colors.accent : colors.textSecondary}
@@ -341,7 +341,7 @@ export default function SettingsScreen() {
             pressed && { opacity: 0.6 },
           ]}
         >
-          <Ionicons name="log-out-outline" size={20} color={colors.danger} />
+          <Icon name="rectangle.portrait.and.arrow.right" size={20} color={colors.danger} />
           <Text style={[typography.body, { color: colors.danger }]}>Sign Out</Text>
         </Pressable>
         <Pressable
@@ -357,7 +357,7 @@ export default function SettingsScreen() {
           {deleteBusy ? (
             <ActivityIndicator color={colors.danger} />
           ) : (
-            <Ionicons name="trash-outline" size={20} color={colors.danger} />
+            <Icon name="trash" size={20} color={colors.danger} />
           )}
           <Text style={[typography.body, { color: colors.danger }]}>Delete Account</Text>
         </Pressable>

@@ -1,3 +1,4 @@
+import { normalizeLayerIcon } from '@/lib/layers';
 import type { Guide, GuideAccessMember, GuideRole, Layer, Place } from '@/lib/types';
 
 // ---------------------------------------------------------------------------
@@ -20,7 +21,10 @@ export type LayerRow = {
   guide_id: string;
   name: string;
   color: string;
+  /** Legacy emoji — still written by old clients during the transition. */
   emoji: string;
+  /** SF Symbol name; null on rows written by old clients. */
+  icon: string | null;
   kind: string | null;
   hidden: boolean;
   collapsed: boolean;
@@ -39,6 +43,7 @@ export type PlaceRow = {
   longitude: number;
   category: string | null;
   added_by: string | null;
+  apple_place_id: string | null;
   created_at: string;
   updated_at: string;
 };
@@ -50,7 +55,8 @@ export function layerRowToLayer(r: LayerRow): Layer {
     id: r.id,
     name: r.name,
     color: r.color,
-    emoji: r.emoji,
+    // Old clients write only the emoji; derive the symbol from it then.
+    icon: normalizeLayerIcon(r.icon ?? r.emoji),
     kind: r.kind ?? undefined,
     // hidden/collapsed are per-user view state, not synced guide data. Ignore the
     // server value and default to visible/expanded; the current user's local
@@ -71,6 +77,7 @@ export function placeRowToPlace(r: PlaceRow): Place {
     addedAt: ms(r.created_at),
     layerId: r.layer_id ?? undefined,
     addedBy: r.added_by ?? undefined,
+    applePlaceId: r.apple_place_id ?? undefined,
   };
 }
 

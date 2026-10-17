@@ -1,4 +1,4 @@
-import { Ionicons } from '@expo/vector-icons';
+import Icon from '@/components/Icon';
 import { useCallback, useEffect } from 'react';
 import { Dimensions, Pressable, StyleSheet, Text, View } from 'react-native';
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
@@ -119,21 +119,23 @@ export default function PlaceRow({
       {/* Red delete action behind the row */}
       <Reanimated.View style={[styles.action, { backgroundColor: colors.danger }, actionStyle]}>
         <Pressable onPress={tapDelete} style={styles.actionBtn}>
-          <Ionicons name="trash" size={20} color="#fff" />
+          <Icon name="trash.fill" size={20} color="#fff" />
           <Text style={styles.actionText}>Delete</Text>
         </Pressable>
       </Reanimated.View>
 
       {/* Sliding row content */}
       <GestureDetector gesture={pan}>
-        <Reanimated.View style={[styles.slide, { backgroundColor: colors.surface }, rowStyle]}>
+        {/* Transparent, so the sheet's Liquid Glass shows through — the delete
+            action behind is width-clipped to the swipe, never visible at rest. */}
+        <Reanimated.View style={[styles.slide, rowStyle]}>
           <Pressable
             onPress={onPress}
             onLongPress={onLongPress}
             style={({ pressed }) => [styles.row, pressed && { opacity: 0.6 }]}
           >
             <View style={[styles.dot, { backgroundColor: color }, visited && styles.dimmed]}>
-              <Ionicons name="location-sharp" size={16} color="#fff" />
+              <Icon name="mappin" size={16} color="#fff" />
             </View>
 
             <View style={[styles.body, visited && styles.dimmed]}>
@@ -154,8 +156,8 @@ export default function PlaceRow({
             </View>
 
             {visited && (
-              <Ionicons
-                name="checkmark-circle"
+              <Icon
+                name="checkmark.circle.fill"
                 size={20}
                 color={VISITED_GREEN}
                 style={styles.visitedCheck}

@@ -43,9 +43,11 @@ otp_expiry = 3600
 enroll_enabled = true
 verify_enabled = true
 
+# Native Sign in with Apple (id-token flow): client_id is the iOS bundle id
+# the identity token is issued for. No secret needed for the native flow.
 [auth.external.apple]
-enabled = false
-client_id = ""
+enabled = true
+client_id = "com.guidedmaps.app"
 secret = ""
 
 [storage.vector]

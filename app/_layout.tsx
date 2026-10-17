@@ -1,4 +1,5 @@
 import { QueryClientProvider } from '@tanstack/react-query';
+import { ShareIntentProvider } from 'expo-share-intent';
 import { Stack, useRouter, useSegments } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { useEffect } from 'react';
@@ -86,42 +87,46 @@ export default function RootLayout() {
   useProtectedRoute();
 
   return (
-    <QueryClientProvider client={queryClient}>
-      <GestureHandlerRootView style={{ flex: 1 }}>
-        <SafeAreaProvider>
-          <StatusBar style={scheme === 'dark' ? 'light' : 'dark'} />
-          {status === 'loading' ? (
-            <View
-              style={{
-                flex: 1,
-                alignItems: 'center',
-                justifyContent: 'center',
-                backgroundColor: colors.background,
-              }}
-            >
-              <ActivityIndicator color={colors.textPrimary} />
-            </View>
-          ) : (
-            <Stack
-              screenOptions={{
-                headerShown: false,
-                contentStyle: { backgroundColor: colors.background },
-              }}
-            >
-              <Stack.Screen name="(auth)" />
-              <Stack.Screen name="complete-profile" options={{ gestureEnabled: false }} />
-              <Stack.Screen name="index" />
-              <Stack.Screen name="settings" />
-              <Stack.Screen name="guide/[id]/index" />
-              <Stack.Screen name="guide/[id]/search" options={{ presentation: 'modal' }} />
-              <Stack.Screen name="guide/[id]/layers" options={{ presentation: 'modal' }} />
-              <Stack.Screen name="guide/[id]/share" options={{ presentation: 'modal' }} />
-              <Stack.Screen name="guide/[id]/settings" options={{ presentation: 'modal' }} />
-              <Stack.Screen name="share/[token]" options={{ presentation: 'modal' }} />
-            </Stack>
-          )}
-        </SafeAreaProvider>
-      </GestureHandlerRootView>
-    </QueryClientProvider>
+    // ShareIntentProvider first: the share extension re-launches the app and
+    // the home screen consumes the shared Apple Maps guide link from context.
+    <ShareIntentProvider>
+      <QueryClientProvider client={queryClient}>
+        <GestureHandlerRootView style={{ flex: 1 }}>
+          <SafeAreaProvider>
+            <StatusBar style={scheme === 'dark' ? 'light' : 'dark'} />
+            {status === 'loading' ? (
+              <View
+                style={{
+                  flex: 1,
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  backgroundColor: colors.background,
+                }}
+              >
+                <ActivityIndicator color={colors.textPrimary} />
+              </View>
+            ) : (
+              <Stack
+                screenOptions={{
+                  headerShown: false,
+                  contentStyle: { backgroundColor: colors.background },
+                }}
+              >
+                <Stack.Screen name="(auth)" />
+                <Stack.Screen name="complete-profile" options={{ gestureEnabled: false }} />
+                <Stack.Screen name="index" />
+                <Stack.Screen name="settings" />
+                <Stack.Screen name="guide/[id]/index" />
+                <Stack.Screen name="guide/[id]/search" options={{ presentation: 'modal' }} />
+                <Stack.Screen name="guide/[id]/layers" options={{ presentation: 'modal' }} />
+                <Stack.Screen name="guide/[id]/share" options={{ presentation: 'modal' }} />
+                <Stack.Screen name="guide/[id]/settings" options={{ presentation: 'modal' }} />
+                <Stack.Screen name="share/[token]" options={{ presentation: 'modal' }} />
+              </Stack>
+            )}
+          </SafeAreaProvider>
+        </GestureHandlerRootView>
+      </QueryClientProvider>
+    </ShareIntentProvider>
   );
 }

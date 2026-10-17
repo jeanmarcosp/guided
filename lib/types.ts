@@ -8,13 +8,16 @@ export type Place = {
   addedAt: number;
   layerId?: string; // which layer this place belongs to
   addedBy?: string; // server user id of who added it (collaboration attribution)
+  /** Apple Maps stable Place ID (MKMapItem.identifier, iOS 18+) — opens the exact place card. */
+  applePlaceId?: string;
 };
 
 export type Layer = {
   id: string;
   name: string;
   color: string;
-  emoji: string;
+  /** SF Symbol name (e.g. "fork.knife") — rendered on pins and badges. */
+  icon: string;
   /** Taxonomy key used to auto-route new places; undefined for custom layers. */
   kind?: string;
   hidden?: boolean; // pins hidden on the map
