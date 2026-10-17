@@ -88,6 +88,7 @@ export default function GuideDetail() {
   const [sheetHeaderHeight, setSheetHeaderHeight] = useState(0);
   const [searchOpen, setSearchOpen] = useState(false);
   const [search, setSearch] = useState('');
+  const [keyboardHeight, setKeyboardHeight] = useState(0);
   const query = search.trim().toLowerCase();
   const searching = query.length > 0;
 
@@ -392,6 +393,22 @@ export default function GuideDetail() {
     prevCount.current = places.length;
   }, [places, fitToPlaces]);
 
+  // The sheet rises to its tallest detent while the keyboard is up
+  // (keyboardBehavior="extend"), but the list's animated height still runs to
+  // the screen bottom BEHIND the keyboard — pad it so every match stays
+  // reachable. iOS-only events: on Android these never fire, the height stays
+  // 0, and the padding falls back to the safe-area inset as before.
+  useEffect(() => {
+    const show = Keyboard.addListener('keyboardWillShow', (e) =>
+      setKeyboardHeight(e.endCoordinates.height),
+    );
+    const hide = Keyboard.addListener('keyboardWillHide', () => setKeyboardHeight(0));
+    return () => {
+      show.remove();
+      hide.remove();
+    };
+  }, []);
+
   function focusPlace(place: Place) {
     Haptics.selectionAsync();
     sheetRef.current?.snapToIndex(1); // medium — keep the list visible, reveal the map
@@ -616,6 +633,11 @@ export default function GuideDetail() {
         index={1}
         snapPoints={snapPoints}
         enableDynamicSizing={false}
+        // Keyboard: rise to the tallest detent so the field and results clear it,
+        // then drop back to the detent we were at when it hides (the Search key,
+        // Cancel, or a swipe-down all route through the same blur).
+        keyboardBehavior="extend"
+        keyboardBlurBehavior="restore"
         animatedPosition={sheetTop}
         style={styles.sheetFloat}
         backgroundComponent={({ style }) => (
@@ -720,6 +742,7 @@ export default function GuideDetail() {
                   placeholderTextColor={colors.textTertiary}
                   autoCorrect={false}
                   returnKeyType="search"
+                  onSubmitEditing={() => Keyboard.dismiss()}
                   clearButtonMode="never"
                   style={[styles.searchInput, { color: colors.textPrimary }]}
                 />
@@ -785,7 +808,7 @@ export default function GuideDetail() {
             stickySectionHeadersEnabled={false}
             contentContainerStyle={{
               paddingHorizontal: spacing.lg,
-              paddingBottom: insets.bottom + spacing.xl,
+              paddingBottom: (keyboardHeight > 0 ? keyboardHeight : insets.bottom) + spacing.xl,
             }}
             ListEmptyComponent={
               <View style={[styles.sheetEmpty, { height: emptyStateHeight }]}>
