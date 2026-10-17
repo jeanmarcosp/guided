@@ -2,7 +2,7 @@
   "expo": {
     "name": "Guided Maps",
     "slug": "guided",
-    "version": "1.0.0",
+    "version": "1.1.0",
     "scheme": "guided",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
@@ -10,7 +10,6 @@
     "ios": {
       "supportsTablet": false,
       "bundleIdentifier": "com.guidedmaps.app",
-      "buildNumber": "1",
       "infoPlist": {
         "ITSAppUsesNonExemptEncryption": false
       },
