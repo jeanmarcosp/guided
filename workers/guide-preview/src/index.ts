@@ -45,7 +45,10 @@ type Preview = {
 };
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
-const BRAND_BG = '#132A13';
+const BRAND_BG = '#5ADBFF';
+// Text colour for use ON the brand colour. The brand is light (9.6:1 against
+// this ink, 1.6:1 against white), so these pages are light-themed.
+const BRAND_INK = '#0B2733';
 
 export default {
   async fetch(request: Request, env: Env): Promise<Response> {
@@ -139,11 +142,11 @@ function sharePage(p: Preview, token: string, url: URL, env: Env): Response {
 <meta name="twitter:image" content="${canonical}/og.png" />
 <meta name="theme-color" content="${color}" />
 ${smartBanner}<style>
-  :root { color-scheme: dark; }
+  :root { color-scheme: light; }
   * { margin: 0; box-sizing: border-box; }
   body {
     min-height: 100dvh; display: flex; align-items: center; justify-content: center;
-    background: ${BRAND_BG}; color: #fff; padding: 24px;
+    background: ${BRAND_BG}; color: ${BRAND_INK}; padding: 24px;
     font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Segoe UI', Roboto, sans-serif;
     text-align: center;
   }
@@ -154,16 +157,16 @@ ${smartBanner}<style>
     font-size: 52px; box-shadow: 0 12px 40px rgba(0,0,0,.35);
   }
   h1 { font-size: 28px; font-weight: 700; letter-spacing: -0.3px; margin-bottom: 8px; }
-  .sub { font-size: 16px; color: rgba(255,255,255,.65); line-height: 1.45; margin-bottom: 28px; }
+  .sub { font-size: 16px; color: rgba(11,39,51,.70); line-height: 1.45; margin-bottom: 28px; }
   .open {
     display: inline-flex; align-items: center; justify-content: center; gap: 8px;
-    width: 100%; height: 52px; border-radius: 14px; background: #fff; color: ${BRAND_BG};
+    width: 100%; height: 52px; border-radius: 14px; background: ${BRAND_INK}; color: #fff;
     font-size: 17px; font-weight: 600; text-decoration: none;
   }
-  .hint { margin-top: 16px; font-size: 13px; color: rgba(255,255,255,.4); }
+  .hint { margin-top: 16px; font-size: 13px; color: rgba(11,39,51,.55); }
   .alt { margin-top: 20px; font-size: 14px; }
-  .alt a { color: rgba(255,255,255,.75); text-decoration: underline; }
-  .brand { margin-top: 48px; font-size: 14px; font-weight: 600; color: rgba(255,255,255,.5); }
+  .alt a { color: rgba(11,39,51,.8); text-decoration: underline; }
+  .brand { margin-top: 48px; font-size: 14px; font-weight: 600; color: rgba(11,39,51,.6); }
 </style>
 </head>
 <body>
@@ -448,16 +451,16 @@ function simplePage(emoji: string, title: string, sub: string, status: number): 
 <title>${esc(title)} — Guided</title>
 <meta name="theme-color" content="${BRAND_BG}" />
 <style>
-  :root { color-scheme: dark; }
+  :root { color-scheme: light; }
   * { margin: 0; box-sizing: border-box; }
   body {
     min-height: 100dvh; display: flex; align-items: center; justify-content: center;
-    background: ${BRAND_BG}; color: #fff; padding: 24px; text-align: center;
+    background: ${BRAND_BG}; color: ${BRAND_INK}; padding: 24px; text-align: center;
     font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Segoe UI', Roboto, sans-serif;
   }
   .emoji { font-size: 56px; margin-bottom: 16px; }
   h1 { font-size: 26px; font-weight: 700; margin-bottom: 8px; }
-  p { font-size: 16px; color: rgba(255,255,255,.65); max-width: 360px; line-height: 1.45; }
+  p { font-size: 16px; color: rgba(11,39,51,.70); max-width: 360px; line-height: 1.45; }
 </style>
 </head>
 <body>
